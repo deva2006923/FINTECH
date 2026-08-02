@@ -75,8 +75,11 @@ CATEGORY_KEYWORDS = {
     "Health": ["pharmacy", "hospital", "doctor", "medical", "gym"],
 }
 
-def generate_sample_data(n=180, seed=42):
-    rng = np.random.default_rng(seed)
+def generate_sample_data(user_id="default", n=120):
+    # Seed with hash of user_id so every user gets a UNIQUE data profile!
+    import hashlib
+    seed_val = int(hashlib.md5(user_id.encode('utf-8')).hexdigest()[:8], 16) % (2**31)
+    rng = np.random.default_rng(seed_val)
     rows = []
     start = datetime.today() - timedelta(days=90)
     merchants = [m for cat in CATEGORY_KEYWORDS.values() for m in cat]
@@ -95,13 +98,13 @@ def generate_sample_data(n=180, seed=42):
         rows.append({"date": date.date(), "description": merchant.title(), "amount": amount, "true_category": cat})
 
     # inject a few anomalies
-    for _ in range(4):
+    for _ in range(3):
         day_offset = int(rng.integers(0, 90))
         date = start + timedelta(days=day_offset)
         rows.append({
             "date": date.date(),
-            "description": rng.choice(["Unknown Merchant", "Cash Withdrawal", "Foreign Txn"]),
-            "amount": round(float(rng.uniform(15000, 40000)), 2),
+            "description": rng.choice(["Unknown Merchant", "High Cash Withdrawal", "Unusual Online Purchase"]),
+            "amount": round(float(rng.uniform(12000, 35000)), 2),
             "true_category": "Other",
         })
     df = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
@@ -137,10 +140,12 @@ def load_ledger_data(uid):
             return df
         except Exception:
             pass
-    df = generate_sample_data()
+    # Generate user-specific sample dataset
+    df = generate_sample_data(user_id=uid)
     df["user_id"] = uid
     save_ledger_data(df, uid)
     return df
+
 
 
 def load_group_ledger(group_id, my_uid):
@@ -345,12 +350,11 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Logout
+    # Logout — completely reset session state
     if st.button("⎋  Logout", key="logout_btn", use_container_width=True):
-        for k in ["logged_in", "auth_profile", "data", "view_group",
-                  "resolving_gap", "pending_entry", "missing_dates"]:
-            st.session_state.pop(k, None)
+        st.session_state.clear()
         st.rerun()
+
 
     # Display name edit
     new_name = st.text_input(

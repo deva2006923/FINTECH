@@ -1,6 +1,12 @@
 import pandas as pd
-import google.generativeai as genai
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 from datetime import datetime, timedelta
+
 
 def parse_natural_language_query(query, df):
     query = query.lower().strip()
@@ -301,13 +307,15 @@ def run_open_ended_analysis(query, df, api_key=None):
             
             model = genai.GenerativeModel("gemini-1.5-flash")
             response = model.generate_content(prompt)
-            return f"<div class='mono' style='font-size:0.85rem; line-height:1.4; color:#1B2A26;'>🤖 AI advisor:<br><br>{response.text.replace(chr(10), '<br>')}</div>"
+            clean_text = response.text.replace("\n", "<br>")
+            return f"<div style='font-family:\"IBM Plex Mono\", monospace; font-size:13px; line-height:1.6; color:var(--ink-black);'><b style='color:var(--stamp-red);'>🤖 AI Advisor:</b><br><br>{clean_text}</div>"
         except Exception as e:
-            return f"<div class='mono' style='font-size:0.85rem; line-height:1.4; color:#1B2A26;'>" \
-                   f"🤖 AI advisor (error calling Gemini):<br><br>" \
-                   f"Could not connect to live Gemini API ({str(e)}).<br><br>" \
-                   f"Running local fallback analysis...<hr style='border-top:1px dashed rgba(27,42,38,0.15);'>{get_local_fallback_summary(query, df)}</div>"
+            return f"<div style='font-family:\"IBM Plex Mono\", monospace; font-size:13px; line-height:1.6; color:var(--ink-black);'>" \
+                   f"<b style='color:var(--stamp-red);'>🤖 AI Advisor:</b><br>" \
+                   f"<span style='font-size:11px; opacity:0.75;'>Notice: Live Gemini query unavailable ({str(e)}). Displaying local analytical engine summary:</span><br><br>" \
+                   f"{get_local_fallback_summary(query, df)}</div>"
 
-    return f"<div class='mono' style='font-size:0.85rem; line-height:1.4; color:#1B2A26;'>" \
-           f"🤖 local advisor (Gemini API key not configured):<br><br>" \
+    return f"<div style='font-family:\"IBM Plex Mono\", monospace; font-size:13px; line-height:1.6; color:var(--ink-black);'>" \
+           f"<b style='color:var(--stamp-red);'>🤖 Financial Advisor Engine:</b><br><br>" \
            f"{get_local_fallback_summary(query, df)}</div>"
+
