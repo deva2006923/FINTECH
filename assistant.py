@@ -101,6 +101,15 @@ def parse_natural_language_query(query, df, history=None):
             break
             
     # 3. Check query type
+    if any(term in query for term in ["bar graph", "bargraph", "chart", "graph", "plot", "bar chart"]):
+        return {
+            "type": "bar_chart",
+            "category": matched_category,
+            "start_date": start_date,
+            "end_date": end_date,
+            "query": query
+        }
+
     if "anomaly" in query or "flagged" in query or "unusual" in query:
         anom_df = df[df["anomaly"] == -1]
         return {
@@ -150,7 +159,34 @@ def execute_assistant_query(parsed, df):
     df_eval = df.copy()
     df_eval["date_parsed"] = pd.to_datetime(df_eval["date"]).dt.date
     
-    if q_type == "spend_summary":
+    if q_type == "bar_chart":
+        filtered = df_eval.copy()
+        if parsed.get("category"):
+            filtered = filtered[filtered["category"] == parsed["category"]]
+        if parsed.get("start_date"):
+            filtered = filtered[(filtered["date_parsed"] >= parsed["start_date"]) & (filtered["date_parsed"] <= parsed["end_date"])]
+            
+        by_cat = filtered.groupby("category")["amount"].sum().sort_values(ascending=False)
+        max_val = by_cat.max() if not by_cat.empty and by_cat.max() > 0 else 1.0
+        
+        resp = f"<div class='mono' style='font-size:0.85rem; line-height:1.4; color:#1B2A26;'>"
+        resp += f"Parsed Query: *{parsed['query']}*<br><br>"
+        resp += f"<strong>📊 Monthly Expense Bar Graph:</strong><br><br>"
+        
+        if not by_cat.empty:
+            for cat, amt in by_cat.items():
+                pct = int((amt / max_val) * 100)
+                resp += f"<div style='margin-bottom:10px;'>" \
+                        f"<div style='display:flex; justify-content:space-between; font-weight:600; font-size:12px;'>" \
+                        f"<span>{cat}</span><span>₹{amt:,.2f}</span></div>" \
+                        f"<div style='background:rgba(212,175,55,0.15); border-radius:4px; overflow:hidden; height:12px; margin-top:3px; border:1px solid rgba(212,175,55,0.3);'>" \
+                        f"<div style='background:#D4AF37; width:{pct}%; height:100%;'></div></div></div>"
+        else:
+            resp += "*No transactions found in this date range to plot.*"
+        resp += "</div>"
+        return resp
+
+    elif q_type == "spend_summary":
         cat = parsed["category"]
         start = parsed["start_date"]
         end = parsed["end_date"]
@@ -314,6 +350,18 @@ def get_local_fallback_summary(query, df):
             summary += f"→ *{top_cat}*: This is your primary expense driver. Consider tracking individual items to optimize outflows.<br>"
             
     summary += "→ *General advice*: Setting aside an automated 10-20% baseline savings chunk at the start of each month can safeguard your long-term buffer."
+    
+    if any(term in query.lower() for term in ["bar graph", "bargraph", "chart", "graph", "plot"]):
+        summary += "<br><br>📊 **Category Spending Bar Graph:**<br>"
+        max_val = by_cat.max() if not by_cat.empty and by_cat.max() > 0 else 1.0
+        for cat, amt in by_cat.items():
+            pct = int((amt / max_val) * 100)
+            summary += f"<div style='margin-top:6px;'>" \
+                       f"<div style='display:flex; justify-content:space-between; font-size:11px;'>" \
+                       f"<span>{cat}</span><span>₹{amt:,.2f}</span></div>" \
+                       f"<div style='background:rgba(212,175,55,0.2); border-radius:3px; height:10px; margin-top:2px;'>" \
+                       f"<div style='background:#D4AF37; width:{pct}%; height:100%; border-radius:3px;'></div></div></div>"
+                       
     return summary
 
 def run_open_ended_analysis(query, df, api_key=None):

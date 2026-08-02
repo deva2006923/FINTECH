@@ -480,21 +480,23 @@ with st.sidebar:
             st.session_state.view_group = view_toggle
             st.rerun()
 
-        # Member list
-        st.markdown("**Members**")
+        # Member list with click to view individual user
+        st.markdown("**Family Members (Click to view)**")
         for uid in members:
             mp = _auth.get_user_by_uid(uid)
             m_name = mp["display_name"] if mp else uid
-            host_tag = '<span class="member-host-tag">HOST</span>' if uid == group_data["host_uid"] else ""
-            you_tag  = " · you" if uid == my_uid else ""
-            st.markdown(
-                f'<div class="member-row">'
-                f'<div class="member-avatar">{m_name[0].upper()}</div>'
-                f'<div><div class="member-name">{m_name}{you_tag}</div>'
-                f'<div class="member-uid">{uid}</div></div>'
-                f'{host_tag}</div>',
-                unsafe_allow_html=True,
-            )
+            host_tag = " (HOST)" if uid == group_data["host_uid"] else ""
+            you_tag  = " (You)" if uid == my_uid else ""
+            
+            is_active = (st.session_state.get("selected_user_id") == uid) and not st.session_state.view_group
+            btn_label = f"👤 {m_name}{you_tag}{host_tag}"
+            if is_active:
+                btn_label = f"▶ {m_name}{you_tag}{host_tag}"
+                
+            if st.button(btn_label, key=f"nav_mem_{uid}", use_container_width=True):
+                st.session_state.selected_user_id = uid
+                st.session_state.view_group = False
+                st.rerun()
 
         # Host-only: invite by UserID
         if is_host:
@@ -608,10 +610,13 @@ with st.sidebar:
 # DATA — load personal or group ledger
 # ======================================================================
 current_group_id = st.session_state.get("active_group_id")
+if "selected_user_id" not in st.session_state:
+    st.session_state.selected_user_id = my_uid
+
 if st.session_state.view_group and current_group_id:
     df = load_group_ledger(current_group_id, my_uid)
 else:
-    df = load_ledger_data(my_uid)
+    df = load_ledger_data(st.session_state.selected_user_id)
 
 if "user_id" not in df.columns:
     df["user_id"] = my_uid
@@ -806,6 +811,16 @@ with col_left:
         <div class="receipt-footer">*** Thank you for tracking responsibly ***</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # 📊 Category Spending Bar Graph
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">📊 Category Spending Bar Graph</div>', unsafe_allow_html=True)
+        by_cat_df = df.groupby("category")["amount"].sum().reset_index()
+        if not by_cat_df.empty:
+            st.bar_chart(by_cat_df.set_index("category")["amount"], height=200)
+        else:
+            st.markdown('<span class="mono">No expense data available.</span>', unsafe_allow_html=True)
 
 # ── RIGHT: Card Stack ──────────────────────────────────────────────────
 with col_right:
