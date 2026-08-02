@@ -19,8 +19,8 @@
 /* Kill Streamlit default chrome look */
 #MainMenu, header, footer {visibility: hidden;}
 .block-container {
-    padding-top: 2rem;
-    padding-bottom: 3rem;
+    padding-top: 24px !important;    /* 8px multiple */
+    padding-bottom: 40px !important; /* 8px multiple */
     max-width: 1200px;
 }
 
@@ -31,28 +31,31 @@ h1, h2, h3 {
     letter-spacing: -0.01em;
 }
 
+.header-block {
+    margin-bottom: 32px !important;  /* Strict 32px bottom margin under header */
+}
+
 .app-title {
-    font-size: 2.1rem;
-    font-weight: 700;
-    margin-bottom: 0.1rem;
+    font-size: 32px !important;       /* Strict 32px page title */
+    font-weight: 700 !important;
+    margin-bottom: 8px !important;    /* 8px multiple */
+    font-family: 'Space Grotesk', sans-serif !important;
 }
 .app-subtitle {
-    font-family: 'IBM Plex Mono', monospace;
-    color: var(--sage);
-    font-size: 0.85rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 2rem;
+    font-family: 'IBM Plex Mono', monospace !important;
+    color: var(--sage) !important;
+    font-size: 15px !important;       /* Strict 15px body/data font size */
+    font-weight: 400 !important;
 }
 
 /* ---- RECEIPT CARD (signature element) ---- */
 .receipt {
-    background: var(--paper-cream);
-    color: var(--ink-black);
-    padding: 2rem 1.8rem 1.5rem 1.8rem;
-    font-family: 'IBM Plex Mono', monospace;
-    position: relative;
-    box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    background: var(--paper-cream) !important;
+    color: var(--ink-black) !important;
+    padding: 24px !important;         /* Strict 24px spacing grid */
+    font-family: 'IBM Plex Mono', monospace !important;
+    position: relative !important;
+    box-shadow: 0 16px 32px rgba(0,0,0,0.35) !important;
     clip-path: polygon(
         0% 0%, 100% 0%, 100% 96%,
         96% 100%, 92% 96%, 88% 100%, 84% 96%, 80% 100%,
@@ -60,125 +63,123 @@ h1, h2, h3 {
         56% 100%, 52% 96%, 48% 100%, 44% 96%, 40% 100%,
         36% 96%, 32% 100%, 28% 96%, 24% 100%, 20% 96%,
         16% 100%, 12% 96%, 8% 100%, 4% 96%, 0% 100%
-    );
+    ) !important;
 }
 .receipt-header {
-    text-align: center;
-    border-bottom: 1px dashed var(--ink-black);
-    padding-bottom: 0.8rem;
-    margin-bottom: 0.8rem;
+    text-align: center !important;
+    border-bottom: 1px dashed var(--ink-black) !important;
+    padding-bottom: 16px !important;  /* 8px multiple */
+    margin-bottom: 16px !important;   /* 8px multiple */
 }
 .receipt-header .label {
-    font-size: 0.7rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    opacity: 0.65;
+    font-size: 12px !important;       /* Strict 12px section label */
+    font-weight: 600 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    opacity: 0.65 !important;
 }
 .receipt-header .amount {
-    font-size: 2.4rem;
-    font-weight: 700;
-    color: var(--stamp-red);
+    font-size: 40px !important;       /* Strict 40px big numbers */
+    font-weight: 700 !important;
+    color: var(--stamp-red) !important;
+    margin-top: 8px !important;       /* 8px multiple */
 }
 .receipt-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.92rem;
-    padding: 0.28rem 0;
-    border-bottom: 1px dotted var(--paper-line);
+    display: flex !important;
+    justify-content: space-between !important;
+    font-size: 15px !important;       /* Strict 15px body/data */
+    padding: 8px 0 !important;        /* 8px multiple */
+    border-bottom: 1px dotted var(--paper-line) !important;
 }
 .receipt-row .cat {
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    text-transform: uppercase !important;
 }
 .receipt-row .amt {
-    font-weight: 600;
+    font-weight: 700 !important;
 }
 .receipt-footer {
-    text-align: center;
-    margin-top: 1rem;
-    font-size: 0.7rem;
-    letter-spacing: 0.12em;
-    opacity: 0.55;
-    text-transform: uppercase;
+    text-align: center !important;
+    margin-top: 16px !important;      /* 8px multiple */
+    font-size: 12px !important;       /* Strict 12px section label */
+    letter-spacing: 0.12em !important;
+    opacity: 0.55 !important;
+    text-transform: uppercase !important;
 }
 
 /* Stamp badge for anomalies */
 .stamp {
-    display: inline-block;
-    border: 2px solid var(--stamp-red);
-    color: var(--stamp-red);
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: 700;
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 0.15rem 0.5rem;
-    border-radius: 3px;
-    transform: rotate(-3deg);
+    display: inline-block !important;
+    border: 2px solid var(--stamp-red) !important;
+    color: var(--stamp-red) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;       /* Strict 12px label */
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    padding: 8px 16px !important;     /* 8px grid spacing multiples */
+    border-radius: 3px !important;
+    transform: rotate(-3deg) !important;
 }
 
-/* Panel (right column) */
-.panel {
-    background: rgba(242,236,221,0.05);
-    border: 1px solid rgba(242,236,221,0.15);
-    border-radius: 6px;
-    padding: 1.4rem 1.5rem;
-    margin-bottom: 1.2rem;
-}
+/* Panel Titles inside Right Column Cards */
 .panel-title {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin-bottom: 0.9rem;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 12px !important;       /* Strict 12px label */
+    font-weight: 600 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: var(--gold) !important;
+    margin-bottom: 16px !important;   /* 8px multiple */
 }
 
-/* Numbers everywhere use mono */
+/* Numbers and body text override */
 .mono {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 15px !important;       /* Strict 15px body/data */
+    font-weight: 400 !important;
 }
 
-/* Sidebar */
+/* Sidebar config rules */
 section[data-testid="stSidebar"] {
-    background-color: #16211D;
-    border-right: 1px solid rgba(242,236,221,0.1);
+    background-color: #16211D !important;
+    border-right: 1px solid rgba(242,236,221,0.1) !important;
 }
 section[data-testid="stSidebar"] * {
     color: var(--paper-cream) !important;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace !important;
 }
 
-/* Dataframe */
+/* Dataframe styling */
 [data-testid="stDataFrame"] {
-    background: var(--paper-cream);
-    border-radius: 6px;
+    background: var(--paper-cream) !important;
+    border-radius: 6px !important;
 }
 
 /* Buttons */
 .stButton > button {
-    background-color: var(--stamp-red);
-    color: var(--paper-cream);
-    border: none;
-    border-radius: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    font-size: 0.78rem;
-    padding: 0.5rem 1.1rem;
+    background-color: var(--stamp-red) !important;
+    color: var(--paper-cream) !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    font-size: 12px !important;       /* Strict 12px label */
+    padding: 8px 16px !important;     /* 8px grid spacing */
 }
 .stButton > button:hover {
-    background-color: #a63e21;
-    color: var(--paper-cream);
+    background-color: #a63e21 !important;
+    color: var(--paper-cream) !important;
 }
 
+/* Streamlit Container wrapper scoped overrides */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) {
     background: rgba(242,236,221,0.05) !important;
     border: 1px solid rgba(242,236,221,0.15) !important;
     border-radius: 6px !important;
-    padding: 1.4rem 1.5rem !important;
-    margin-bottom: 1.2rem !important;
+    padding: 24px !important;         /* Strict 24px uniform padding */
+    margin-bottom: 16px !important;   /* Strict 16px consistent gap gap between panels */
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     padding: 0 !important;
@@ -189,23 +190,23 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     background: #F2ECDD !important;
     color: #1B2A26 !important;
     border-left: 5px solid var(--gold) !important;
-    padding: 1.2rem 1.4rem !important;
+    padding: 24px !important;         /* Strict 24px padding */
     font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.85rem !important;
+    font-size: 15px !important;       /* Strict 15px body/data */
     position: relative !important;
     box-shadow: 2px 4px 12px rgba(0,0,0,0.15) !important;
-    margin-top: 1.5rem !important;
-    margin-bottom: 1rem !important;
+    margin-top: 24px !important;      /* 8px multiple */
+    margin-bottom: 16px !important;   /* 8px multiple */
     border-radius: 2px !important;
 }
 .stapled-note::before {
     content: "" !important;
     position: absolute !important;
-    top: -5px !important;
+    top: -4px !important;             /* 8px multiple alignment */
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 38px !important;
-    height: 10px !important;
+    width: 40px !important;           /* Multiple of 8 (40px) */
+    height: 8px !important;           /* Multiple of 8 (8px) */
     background: rgba(193, 80, 46, 0.5) !important; /* Stamped ink dark red staple marker */
     border-left: 2px solid rgba(0,0,0,0.1) !important;
     border-right: 2px solid rgba(0,0,0,0.1) !important;
@@ -214,64 +215,64 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
 
 /* Heatmap Container */
 .heatmap-scroll-container {
-    overflow-x: auto;
-    width: 100%;
-    padding: 0.5rem 0;
-    margin: 1rem 0;
+    overflow-x: auto !important;
+    width: 100% !important;
+    padding: 8px 0 !important;        /* 8px multiple */
+    margin: 16px 0 !important;        /* 8px multiple */
 }
 .heatmap-cell {
-    position: relative;
-    cursor: pointer;
+    position: relative !important;
+    cursor: pointer !important;
 }
 /* Micro-interaction: styling for tooltip popups matching the physical receipt look */
 .heatmap-cell .tooltip {
-    visibility: hidden;
-    width: 190px;
+    visibility: hidden !important;
+    width: 192px !important;          /* Multiple of 8 (192px) */
     background-color: var(--paper-cream) !important;
     color: #1B2A26 !important;
-    text-align: left;
+    text-align: left !important;
     border: 1px solid rgba(27, 42, 38, 0.2) !important;
     border-radius: 4px !important;
-    padding: 10px !important;
-    position: absolute;
+    padding: 16px !important;         /* 8px multiple */
+    position: absolute !important;
     z-index: 999 !important;
-    bottom: 130%;
-    left: 50%;
-    margin-left: -95px;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3) !important;
+    bottom: 130% !important;
+    left: 50% !important;
+    margin-left: -96px !important;    /* Multiple of 8 (-96px offset) */
+    opacity: 0 !important;
+    transition: opacity 0.2s ease-in-out !important;
+    box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.3) !important;
     font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.72rem !important;
+    font-size: 12px !important;       /* Strict 12px label */
 }
 .heatmap-cell:hover .tooltip {
-    visibility: visible;
-    opacity: 1;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 /* Mini Receipt Aesthetics */
 .mini-receipt-title {
     font-family: 'Space Grotesk', sans-serif !important;
     font-weight: 700 !important;
-    font-size: 0.8rem !important;
+    font-size: 15px !important;       /* Strict 15px body/data */
     border-bottom: 1px dashed #1B2A26 !important;
-    margin-bottom: 6px !important;
-    padding-bottom: 4px !important;
+    margin-bottom: 8px !important;    /* 8px multiple */
+    padding-bottom: 8px !important;   /* 8px multiple */
     color: #1B2A26 !important;
-    text-transform: uppercase;
+    text-transform: uppercase !important;
 }
 .mini-receipt-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 3px;
-    line-height: 1.1;
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-bottom: 8px !important;    /* 8px multiple */
+    line-height: 1.2 !important;
     color: #1B2A26 !important;
 }
 .mini-receipt-total {
     border-top: 1px dashed #1B2A26 !important;
-    margin-top: 6px !important;
-    padding-top: 4px !important;
+    margin-top: 8px !important;       /* 8px multiple */
+    padding-top: 8px !important;      /* 8px multiple */
     font-weight: 700 !important;
-    display: flex;
-    justify-content: space-between;
+    display: flex !important;
+    justify-content: space-between !important;
     color: #1B2A26 !important;
 }

@@ -203,17 +203,21 @@ anomalies = df[df["anomaly"] == -1]
 # ----------------------------------------------------------------------
 # HEADER
 # ----------------------------------------------------------------------
-st.markdown('<div class="app-title">Smart Expense Tracker</div>', unsafe_allow_html=True)
-st.markdown('<div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection</div>', unsafe_allow_html=True)
+st.markdown("""
+<div class="header-block">
+    <div class="app-title">Smart Expense Tracker</div>
+    <div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ----------------------------------------------------------------------
 # GAP RESOLUTION UI
 # ----------------------------------------------------------------------
 if st.session_state.get("resolving_gap", False):
     st.markdown(f"""
-    <div class="panel" style="border: 1px solid var(--gold); background: rgba(212,175,55,0.05); margin-bottom: 2rem;">
+    <div class="panel" style="border: 1px solid var(--gold); background: rgba(212,175,55,0.05); margin-bottom: 16px;">
         <div class="panel-title" style="color: var(--gold);">Gap Resolution Required</div>
-        <span class="mono" style="color: var(--paper-cream); font-size: 0.9rem;">
+        <span class="mono" style="color: var(--paper-cream); font-size: 15px;">
             You have missed logging transactions between <b>{pd.to_datetime(df["date"]).max().date()}</b> and your entry date <b>{st.session_state.pending_entry["date"]}</b>.
             Please specify the spending details for each missing day to maintain complete history.
         </span>
@@ -222,7 +226,7 @@ if st.session_state.get("resolving_gap", False):
     
     with st.form("gap_resolution_form"):
         for d in st.session_state.missing_dates:
-            st.markdown(f"<span class='mono' style='font-size:0.95rem; font-weight:600;'>Date: {d.strftime('%A, %b %d, %Y')}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span class='mono' style='font-size:15px; font-weight:600;'>Date: {d.strftime('%A, %b %d, %Y')}</span>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1.2, 1.5, 1.5])
             with col1:
                 st.checkbox("No Spend (₹0)", key=f"zero_{d}", value=True)
@@ -230,7 +234,7 @@ if st.session_state.get("resolving_gap", False):
                 st.number_input("Amount (₹)", min_value=0.0, step=50.0, key=f"amt_{d}")
             with col3:
                 st.selectbox("Category", options=["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"], index=6, key=f"cat_{d}")
-            st.markdown("<hr style='border-top:1px dotted rgba(242,236,221,0.1); margin: 0.5rem 0;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='border-top:1px dotted rgba(242,236,221,0.1); margin: 8px 0;'>", unsafe_allow_html=True)
             
         if st.form_submit_button("Save and Resolve Gaps"):
             new_rows = []
@@ -281,16 +285,17 @@ if st.session_state.get("resolving_gap", False):
 
 if csv_error is not None:
     st.markdown(f"""
-    <div class="panel" style="border: 1px solid var(--stamp-red); background: rgba(193,80,46,0.05); margin-bottom: 2rem;">
+    <div class="panel" style="border: 1px solid var(--stamp-red); background: rgba(193,80,46,0.05); margin-bottom: 16px;">
         <div class="panel-title" style="color: var(--stamp-red);">Ledger Validation Error</div>
-        <span class="mono" style="color: var(--paper-cream); font-size: 0.9rem;">{csv_error}</span>
+        <span class="mono" style="color: var(--paper-cream); font-size: 15px;">{csv_error}</span>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
 
-col_left, col_right = st.columns([1.1, 1.5], gap="large")
+# ---------------- COLUMNS LAYOUT (40/60 Split) ----------------
+col_left, col_right = st.columns([4, 6], gap="large")
 
-# ---------------- LEFT: RECEIPT CARD ----------------
+# ---------------- LEFT Column: Receipt Card Only ----------------
 with col_left:
     rows_html = ""
     for cat, amt in by_category.items():
@@ -308,11 +313,29 @@ with col_left:
     """
     st.markdown(receipt_html, unsafe_allow_html=True)
 
-# ---------------- RIGHT: PANELS ----------------
+# ---------------- RIGHT Column: Card Stack ----------------
 with col_right:
+    # [1] Calendar Heatmap
     with st.container(border=True):
         st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">Forecast — Next Period</div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">📅 Calendar Heatmap (Last 90 Days)</div>', unsafe_allow_html=True)
+        st.markdown(generate_heatmap_html(df), unsafe_allow_html=True)
+        st.markdown("""
+        <div style="display:flex; justify-content:center; gap:8px; font-size:12px; font-family:'IBM Plex Mono', monospace; opacity:0.75; margin-top:8px;">
+            <span>Less</span>
+            <div style="width:12px; height:12px; background:#2c3b37; border-radius:2px;"></div>
+            <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.25); border-radius:2px;"></div>
+            <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.5); border-radius:2px;"></div>
+            <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.75); border-radius:2px;"></div>
+            <div style="width:12px; height:12px; background:rgb(124, 152, 133); border-radius:2px;"></div>
+            <span>More</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # [2] Forecast Chart
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">📈 Forecast — Next Period</div>', unsafe_allow_html=True)
         chart_df = pd.concat([
             daily.rename(columns={"amount": "Actual"})[["date", "Actual"]].set_index("date"),
             forecast_df.rename(columns={"amount": "Forecast"})[["date", "Forecast"]].set_index("date"),
@@ -324,9 +347,28 @@ with col_right:
             unsafe_allow_html=True,
         )
 
+    # [3] AI Assistant Chat Panel
     with st.container(border=True):
         st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">Anomaly Flags</div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">💬 AI Ledger Assistant</div>', unsafe_allow_html=True)
+        
+        query_input = st.text_input("Ask about your spending data:", placeholder="e.g., How much did I spend on Food this month?")
+        
+        if query_input:
+            parsed = parse_natural_language_query(query_input, df)
+            
+            if parsed["type"] != "open_ended":
+                response_html = execute_assistant_query(parsed, df)
+            else:
+                response_html = run_open_ended_analysis(query_input, df, api_key=api_key)
+                
+            st.markdown(f'<div class="stapled-note">{response_html}</div>', unsafe_allow_html=True)
+
+    # [4] Anomaly Flags & Performance Metrics
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">🚨 Anomaly Flags & Performance Metrics</div>', unsafe_allow_html=True)
+        
         if len(anomalies) == 0:
             st.markdown('<span class="mono">No unusual transactions detected.</span>', unsafe_allow_html=True)
         else:
@@ -350,65 +392,64 @@ with col_right:
                     if ratio >= 1.5:
                         explanation = f"{ratio:.1f}x higher than baseline standard (₹{cat_avg:,.2f})"
                     else:
-                        explanation = "Unusual merchant or transaction descriptor pattern"
+                        explanation = "Unusual merchant descriptor pattern"
                 else:
                     if ratio >= 1.5:
                         explanation = f"{ratio:.1f}x higher than {cat} average (₹{cat_avg:,.2f})"
                     elif ratio <= 0.25 and ratio > 0:
                         explanation = f"{1.0/ratio:.1f}x lower than {cat} average (₹{cat_avg:,.2f})"
                     else:
-                        explanation = f"Unusual timing pattern (day of month) for {cat}"
+                        explanation = f"Unusual timing pattern for {cat}"
 
                 st.markdown(
-                    f'<div class="receipt-row" style="color:var(--paper-cream); border-bottom:1px dotted rgba(242,236,221,0.2); align-items: center; padding: 0.4rem 0;">'
+                    f'<div class="receipt-row" style="color:var(--paper-cream); border-bottom:1px dotted rgba(242,236,221,0.2); align-items: center; padding: 8px 0;">'
                     f'<div style="display: flex; flex-direction: column;">'
                     f'<span class="mono" style="font-weight: 500;">{row["date"]} · {row["description"]}</span>'
-                    f'<span class="mono" style="font-size: 0.75rem; color: var(--gold); opacity: 0.85; margin-top: 0.15rem;">→ {explanation}</span>'
+                    f'<span class="mono" style="font-size: 12px; color: var(--gold); opacity: 0.85; margin-top: 4px;">→ {explanation}</span>'
                     f'</div>'
                     f'<span class="stamp">₹{row["amount"]:,.0f}</span></div>',
                     unsafe_allow_html=True,
                 )
-
-    with st.container(border=True):
-        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">Model Performance Metrics</div>', unsafe_allow_html=True)
+                
+        st.markdown('<hr style="border-top:1px dashed rgba(242,236,221,0.25); margin:16px 0;">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title" style="color:var(--gold); margin-bottom:8px;">Model Performance</div>', unsafe_allow_html=True)
         if metrics is None:
-            st.markdown('<span class="mono" style="opacity:0.65;">No evaluation metrics available (ground-truth labels missing).</span>', unsafe_allow_html=True)
+            st.markdown('<span class="mono" style="opacity:0.65; font-size:15px;">No evaluation metrics available (ground-truth labels missing).</span>', unsafe_allow_html=True)
         else:
             st.markdown(
-                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);">'
+                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15); padding:8px 0;">'
                 f'<span class="mono" style="color:var(--gold);">Accuracy</span>'
                 f'<span class="mono" style="font-weight:700;">{metrics["accuracy"]*100:.1f}%</span></div>'
-                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);">'
+                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15); padding:8px 0;">'
                 f'<span class="mono" style="color:var(--gold);">Weighted F1-Score</span>'
                 f'<span class="mono" style="font-weight:700;">{metrics["f1"]:.3f}</span></div>'
-                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);">'
+                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15); padding:8px 0;">'
                 f'<span class="mono" style="color:var(--gold);">Weighted Precision</span>'
                 f'<span class="mono" style="font-weight:700;">{metrics["precision"]:.3f}</span></div>',
                 unsafe_allow_html=True
             )
             
-            st.markdown('<div class="mono" style="font-size:0.75rem; color:var(--gold); margin-top:1.2rem; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">Confusion Matrix (True \\ Pred)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="mono" style="font-size:12px; color:var(--gold); margin-top:16px; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em;">Confusion Matrix</div>', unsafe_allow_html=True)
             
             labels = metrics["labels"]
             cm = metrics["confusion_matrix"]
             
-            header_cols = "".join(f'<th style="text-align:center; padding:0.25rem; font-weight:600; border-bottom:1px solid rgba(242,236,221,0.25);">{lbl[:4]}</th>' for lbl in labels)
-            thead = f'<thead><tr><th style="text-align:left; padding:0.25rem; font-weight:600; border-bottom:1px solid rgba(242,236,221,0.25);">True \\ Pred</th>{header_cols}</tr></thead>'
+            header_cols = "".join(f'<th style="text-align:center; padding:4px; font-weight:600; border-bottom:1px solid rgba(242,236,221,0.25); font-size:12px;">{lbl[:4]}</th>' for lbl in labels)
+            thead = f'<thead><tr><th style="text-align:left; padding:4px; font-weight:600; border-bottom:1px solid rgba(242,236,221,0.25); font-size:12px;">True \\ Pred</th>{header_cols}</tr></thead>'
             
             rows_html = ""
             for i, true_label in enumerate(labels):
                 cells = "".join(
-                    f'<td style="text-align:center; padding:0.25rem; border-bottom:1px dotted rgba(242,236,221,0.1); '
+                    f'<td style="text-align:center; padding:4px; border-bottom:1px dotted rgba(242,236,221,0.1); font-size:12px; '
                     f'background: {"rgba(124,152,133,0.15)" if i == j and cm[i][j] > 0 else "none"};'
                     f'color: {"var(--sage)" if i == j and cm[i][j] > 0 else "var(--paper-cream)"}; font-weight: {"700" if i == j else "400"};">'
                     f'{cm[i][j]}</td>'
                     for j in range(len(labels))
                 )
-                rows_html += f'<tr><td style="text-align:left; padding:0.25rem; border-bottom:1px dotted rgba(242,236,221,0.1); font-weight:600; text-transform:uppercase; font-size:0.75rem;">{true_label}</td>{cells}</tr>'
+                rows_html += f'<tr><td style="text-align:left; padding:4px; border-bottom:1px dotted rgba(242,236,221,0.1); font-weight:600; text-transform:uppercase; font-size:12px;">{true_label[:4]}</td>{cells}</tr>'
             
             cm_table = f"""
-            <table class="mono" style="width:100%; border-collapse:collapse; color:var(--paper-cream); font-size:0.8rem; margin-top:0.3rem;">
+            <table class="mono" style="width:100%; border-collapse:collapse; color:var(--paper-cream); font-size:12px; margin-top:4px;">
                 {thead}
                 <tbody>
                     {rows_html}
@@ -417,103 +458,50 @@ with col_right:
             """
             st.markdown(cm_table, unsafe_allow_html=True)
 
-    with st.container(border=True):
-        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">💬 AI Ledger Assistant</div>', unsafe_allow_html=True)
-        
-        query_input = st.text_input("Ask about your spending data:", placeholder="e.g., How much did I spend on Food this month?")
-        
-        if query_input:
-            parsed = parse_natural_language_query(query_input, df)
-            
-            if parsed["type"] != "open_ended":
-                response_html = execute_assistant_query(parsed, df)
-            else:
-                response_html = run_open_ended_analysis(query_input, df, api_key=api_key)
-                
-            st.markdown(f'<div class="stapled-note">{response_html}</div>', unsafe_allow_html=True)
+# ---------------- LEDGER HISTORY VIEWS (Full Width) ----------------
+st.markdown('<hr style="border-top:1px solid rgba(242,236,221,0.15); margin:32px 0;">', unsafe_allow_html=True)
+st.markdown('<div class="panel-title" style="margin-top:16px;">Ledger History & Search Filters</div>', unsafe_allow_html=True)
 
-# ---------------- LEDGER HISTORY VIEWS ----------------
-st.markdown('<div class="panel-title" style="margin-top:1.5rem;">Ledger History & Analysis</div>', unsafe_allow_html=True)
-
-view_mode = st.radio(
-    "Select View Mode",
-    options=["Table List", "Calendar Heatmap", "Spending Trend Chart"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
-
-if view_mode == "Table List":
-    # Filters above the table
-    col_filter1, col_filter2 = st.columns(2)
-    with col_filter1:
-        unique_categories = sorted(df["category"].unique())
-        selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories))
-    with col_filter2:
-        min_date = df["date"].min()
-        max_date = df["date"].max()
-        if pd.isnull(min_date):
-            min_date = datetime.today().date()
-        if pd.isnull(max_date):
-            max_date = datetime.today().date()
-        
-        date_range = st.date_input(
-            "Filter by Date Range",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date,
-        )
-
-    # Extract date bounds safely
-    start_date = min_date
-    end_date = max_date
-    if isinstance(date_range, tuple):
-        if len(date_range) == 2:
-            start_date, end_date = date_range
-        elif len(date_range) == 1:
-            start_date = date_range[0]
-            end_date = date_range[0]
-    elif date_range:
-        start_date = date_range
-        end_date = date_range
-
-    # Apply filters
-    df_table = df.copy()
-    if selected_category != "All Categories":
-        df_table = df_table[df_table["category"] == selected_category]
-    df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
-
-    st.dataframe(
-        df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
-        use_container_width=True,
-        height=300,
+col_filter1, col_filter2 = st.columns(2)
+with col_filter1:
+    unique_categories = sorted(df["category"].unique())
+    selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories))
+with col_filter2:
+    min_date = df["date"].min()
+    max_date = df["date"].max()
+    if pd.isnull(min_date):
+        min_date = datetime.today().date()
+    if pd.isnull(max_date):
+        max_date = datetime.today().date()
+    
+    date_range = st.date_input(
+        "Filter by Date Range",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
     )
 
-elif view_mode == "Calendar Heatmap":
-    st.markdown(generate_heatmap_html(df), unsafe_allow_html=True)
-    st.markdown("""
-    <div style="display:flex; justify-content:center; gap:10px; font-size:0.75rem; font-family:'IBM Plex Mono', monospace; opacity:0.75; margin-top:8px;">
-        <span>Less</span>
-        <div style="width:12px; height:12px; background:#2c3b37; border-radius:2px;"></div>
-        <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.25); border-radius:2px;"></div>
-        <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.5); border-radius:2px;"></div>
-        <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.75); border-radius:2px;"></div>
-        <div style="width:12px; height:12px; background:rgb(124, 152, 133); border-radius:2px;"></div>
-        <span>More</span>
-    </div>
-    """, unsafe_allow_html=True)
+# Extract date bounds safely
+start_date = min_date
+end_date = max_date
+if isinstance(date_range, tuple):
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+    elif len(date_range) == 1:
+        start_date = date_range[0]
+        end_date = date_range[0]
+elif date_range:
+    start_date = date_range
+    end_date = date_range
 
-else:
-    col_chart_toggle1, col_chart_toggle2 = st.columns([1.5, 3])
-    with col_chart_toggle1:
-        chart_type = st.radio("Chart Type", ["Line Chart", "Bar Chart"], horizontal=True)
-        
-    df_trend = df.copy()
-    df_trend["date_parsed"] = pd.to_datetime(df_trend["date"])
-    daily_spend_df = df_trend.groupby("date_parsed")["amount"].sum().reset_index()
-    daily_spend_df = daily_spend_df.rename(columns={"amount": "Daily Spend"}).set_index("date_parsed")
-    
-    if chart_type == "Line Chart":
-        st.line_chart(daily_spend_df, height=300)
-    else:
-        st.bar_chart(daily_spend_df, height=300)
+# Apply filters
+df_table = df.copy()
+if selected_category != "All Categories":
+    df_table = df_table[df_table["category"] == selected_category]
+df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
+
+st.dataframe(
+    df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
+    use_container_width=True,
+    height=300,
+)

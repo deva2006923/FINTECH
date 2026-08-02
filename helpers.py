@@ -90,7 +90,7 @@ def generate_heatmap_html(df):
     rows_html = ""
     weekday_labels = ["M", "T", "W", "T", "F", "S", "S"]
     for day_idx in range(7):
-        row_cells = f'<td style="font-family:\'IBM Plex Mono\', monospace; font-size:0.65rem; color:var(--paper-cream); opacity:0.5; padding-right:6px; text-align:right; vertical-align:middle; line-height:1;">{weekday_labels[day_idx]}</td>'
+        row_cells = f'<td style="font-family:\'IBM Plex Mono\', monospace; font-size:12px; font-weight:600; color:var(--paper-cream); opacity:0.5; padding-right:8px; text-align:right; vertical-align:middle; line-height:1;">{weekday_labels[day_idx]}</td>'
         for week in weeks:
             date_obj = week[day_idx]
             amt = daily_spend.get(date_obj, 0.0)
@@ -123,9 +123,9 @@ def generate_heatmap_html(df):
             """
             
             if date_obj < min_date or date_obj > max_date:
-                row_cells += f'<td style="width:14px; height:14px; background:transparent; border-radius:2px;"></td>'
+                row_cells += f'<td style="width:16px; height:16px; background:transparent; border-radius:2px;"></td>'
             else:
-                row_cells += f'<td class="heatmap-cell" style="width:14px; height:14px; background:{bg_color}; border-radius:2px; position:relative;">{tooltip_html}</td>'
+                row_cells += f'<td class="heatmap-cell" style="width:16px; height:16px; background:{bg_color}; border-radius:2px; position:relative;">{tooltip_html}</td>'
         rows_html += f'<tr>{row_cells}</tr>'
         
     heatmap_table = f"""
