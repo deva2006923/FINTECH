@@ -14,6 +14,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import json
+import uuid
+import hashlib
 from datetime import datetime, timedelta
 
 # Import custom architecture modules
@@ -88,55 +91,218 @@ def generate_sample_data(n=180, seed=42):
 # RUNTIME ARCHITECTURE
 # Helper modules: ml_pipeline, assistant, and helpers hold all underlying algorithms.
 # ----------------------------------------------------------------------
-# # ----------------------------------------------------------------------
-# SIDEBAR
+
 # ----------------------------------------------------------------------
-LEDGER_FILE = "ledger_data.csv"
+# USER IDENTITY & GROUP ACCOUNT SYSTEM
+# ----------------------------------------------------------------------
+DATA_DIR = "ledger_data"
+os.makedirs(DATA_DIR, exist_ok=True)
 
-def save_ledger_data(df):
-    df.to_csv(LEDGER_FILE, index=False)
+PROFILE_FILE = os.path.join(DATA_DIR, "user_profile.json")
+GROUP_INDEX_FILE = os.path.join(DATA_DIR, "group_index.json")
 
-def load_ledger_data():
-    if os.path.exists(LEDGER_FILE):
+def load_profile():
+    """Load or create a unique user profile with an 8-char alphanumeric ID."""
+    if os.path.exists(PROFILE_FILE):
+        with open(PROFILE_FILE, "r") as f:
+            return json.load(f)
+    uid = uuid.uuid4().hex[:8].upper()
+    profile = {"user_id": uid, "display_name": "Me", "group_code": None}
+    with open(PROFILE_FILE, "w") as f:
+        json.dump(profile, f)
+    return profile
+
+def save_profile(profile):
+    with open(PROFILE_FILE, "w") as f:
+        json.dump(profile, f)
+
+def load_group_index():
+    """Load the group index mapping group_code -> list of user_ids."""
+    if os.path.exists(GROUP_INDEX_FILE):
+        with open(GROUP_INDEX_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_group_index(index):
+    with open(GROUP_INDEX_FILE, "w") as f:
+        json.dump(index, f)
+
+def generate_group_code():
+    """Generate a deterministic 6-char group code from a fresh UUID."""
+    return uuid.uuid4().hex[:6].upper()
+
+def get_user_ledger_path(uid):
+    return os.path.join(DATA_DIR, f"ledger_{uid}.csv")
+
+def save_ledger_data(df, uid):
+    df.to_csv(get_user_ledger_path(uid), index=False)
+
+def load_ledger_data(uid):
+    path = get_user_ledger_path(uid)
+    if os.path.exists(path):
         try:
-            df = pd.read_csv(LEDGER_FILE)
+            df = pd.read_csv(path)
             df["date"] = pd.to_datetime(df["date"]).dt.date
+            if "user_id" not in df.columns:
+                df["user_id"] = uid
             return df
         except Exception:
             pass
     df = generate_sample_data()
-    save_ledger_data(df)
+    df["user_id"] = uid
+    save_ledger_data(df, uid)
     return df
 
-if "data" not in st.session_state or st.session_state.data is None:
-    st.session_state.data = load_ledger_data()
+def load_group_ledger(group_code, my_uid):
+    """Merge ledger data from all members of the group."""
+    index = load_group_index()
+    members = index.get(group_code, [my_uid])
+    frames = []
+    for uid in members:
+        df_m = load_ledger_data(uid)
+        df_m["user_id"] = uid
+        frames.append(df_m)
+    if frames:
+        merged = pd.concat(frames, ignore_index=True)
+        merged["date"] = pd.to_datetime(merged["date"]).dt.date
+        return merged.sort_values("date").reset_index(drop=True)
+    return load_ledger_data(my_uid)
 
+# Migrate legacy flat ledger_data.csv if it exists
+LEGACY_FILE = "ledger_data.csv"
+if os.path.exists(LEGACY_FILE):
+    _profile_tmp = load_profile()
+    _legacy_path = get_user_ledger_path(_profile_tmp["user_id"])
+    if not os.path.exists(_legacy_path):
+        import shutil
+        shutil.copy(LEGACY_FILE, _legacy_path)
+
+# -- Load user profile and initialize session state --
+if "profile" not in st.session_state:
+    st.session_state.profile = load_profile()
+profile = st.session_state.profile
+my_uid = profile["user_id"]
+
+if "data" not in st.session_state or st.session_state.data is None:
+    st.session_state.data = load_ledger_data(my_uid)
+
+if "view_group" not in st.session_state:
+    st.session_state.view_group = False
+
+# -----------------------------------------------------------------------
+# SIDEBAR
+# -----------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🧾 Ledger")
-    st.markdown("Manage accounts and enter transactions.")
+    # -- Identity Badge --
+    st.markdown(
+        f'<div class="sidebar-badge">'
+        f'<div class="badge-label">YOUR LEDGER ID</div>'
+        f'<div class="badge-uid">{my_uid}</div>'
+        f'<div class="badge-hint">Share this with family members to link accounts</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Allow display name edit
+    new_name = st.text_input("Display Name", value=profile.get("display_name", "Me"), key="display_name_input")
+    if new_name != profile.get("display_name", "Me"):
+        profile["display_name"] = new_name
+        save_profile(profile)
+        st.session_state.profile = profile
+
+    st.markdown("---")
+
+    # -- Family / Group Account Section --
+    st.markdown('<div class="panel-title">👨‍👩‍👧 Family Account</div>', unsafe_allow_html=True)
+    current_group = profile.get("group_code")
+
+    if current_group:
+        index = load_group_index()
+        members = index.get(current_group, [my_uid])
+        st.markdown(
+            f'<div class="group-info">'
+            f'<span class="group-label">GROUP CODE</span>'
+            f'<span class="group-code">{current_group}</span>'
+            f'<span class="group-members">{len(members)} member(s) linked</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        view_toggle = st.toggle("View Group Ledger", value=st.session_state.view_group)
+        if view_toggle != st.session_state.view_group:
+            st.session_state.view_group = view_toggle
+            st.rerun()
+
+        if st.button("Leave Group", key="leave_group_btn"):
+            idx = load_group_index()
+            if current_group in idx and my_uid in idx[current_group]:
+                idx[current_group].remove(my_uid)
+                if not idx[current_group]:
+                    del idx[current_group]
+                save_group_index(idx)
+            profile["group_code"] = None
+            save_profile(profile)
+            st.session_state.profile = profile
+            st.session_state.view_group = False
+            st.success("Left group.")
+            st.rerun()
+    else:
+        with st.expander("＋ Create a Group"):
+            if st.button("Generate New Group Code", key="create_group_btn"):
+                new_code = generate_group_code()
+                idx = load_group_index()
+                idx[new_code] = [my_uid]
+                save_group_index(idx)
+                profile["group_code"] = new_code
+                save_profile(profile)
+                st.session_state.profile = profile
+                st.success(f"Group created! Code: **{new_code}**")
+                st.rerun()
+
+        with st.expander("→ Join Existing Group"):
+            join_code = st.text_input("Enter Group Code", max_chars=6, placeholder="e.g. A1B2C3").strip().upper()
+            if st.button("Join Group", key="join_group_btn"):
+                if len(join_code) != 6:
+                    st.error("Code must be exactly 6 characters.")
+                else:
+                    idx = load_group_index()
+                    if join_code not in idx:
+                        st.error("Group code not found. Ask your family member for the correct code.")
+                    elif my_uid in idx[join_code]:
+                        st.info("You are already a member of this group.")
+                    else:
+                        idx[join_code].append(my_uid)
+                        save_group_index(idx)
+                        profile["group_code"] = join_code
+                        save_profile(profile)
+                        st.session_state.profile = profile
+                        st.success(f"Joined group {join_code}!")
+                        st.rerun()
+
+    st.markdown("---")
     forecast_days = st.slider("Forecast horizon (days)", 7, 60, 30)
     st.markdown("---")
     api_key = st.text_input("Gemini API Key", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
     st.markdown("---")
-    st.markdown('<div class="panel-title">Daily Expense Entry</div>', unsafe_allow_html=True)
+
+    # -- Daily Expense Entry Form --
+    st.markdown('<div class="panel-title">📝 Daily Expense Entry</div>', unsafe_allow_html=True)
     with st.form("daily_entry_form", clear_on_submit=True):
         entry_date = st.date_input("Date", value=datetime.today().date())
         entry_desc = st.text_input("Description", placeholder="e.g. Starbucks Coffee")
         entry_amount = st.number_input("Amount (₹)", min_value=0.0, step=10.0)
         entry_category = st.selectbox("Category", ["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"])
-        submit_entry = st.form_submit_button("Submit Entry")
-        
+        submit_entry = st.form_submit_button("✚ Add Entry")
+
     if submit_entry:
         if not entry_desc.strip():
             st.sidebar.error("Please enter a transaction description.")
         elif entry_amount <= 0:
             st.sidebar.error("Amount must be greater than ₹0.")
         else:
-            # Check for gap
-            df_check = st.session_state.data
+            # Use only personal ledger for gap-check (not group)
+            df_check = load_ledger_data(my_uid)
             last_date = pd.to_datetime(df_check["date"]).max().date() if not df_check.empty else datetime.today().date()
             if entry_date > last_date + timedelta(days=1):
-                # Trigger gap resolution state
                 st.session_state.resolving_gap = True
                 st.session_state.pending_entry = {
                     "date": entry_date,
@@ -152,22 +318,30 @@ with st.sidebar:
                 st.session_state.missing_dates = missing_dates
                 st.rerun()
             else:
-                # No gap, just append the entry
+                personal_df = load_ledger_data(my_uid)
                 new_row = pd.DataFrame([{
                     "date": entry_date,
                     "description": entry_desc,
                     "amount": entry_amount,
                     "category": entry_category,
-                    "anomaly": 1
+                    "anomaly": 1,
+                    "user_id": my_uid,
                 }])
-                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
-                st.session_state.data = detect_anomalies(st.session_state.data)
-                save_ledger_data(st.session_state.data)
-                st.sidebar.success("Entry saved successfully!")
+                personal_df = pd.concat([personal_df, new_row], ignore_index=True)
+                personal_df = detect_anomalies(personal_df)
+                save_ledger_data(personal_df, my_uid)
+                st.session_state.data = personal_df
+                st.sidebar.success("Entry saved!")
                 st.rerun()
 
-df = st.session_state.data.copy()
-csv_error = None
+# Determine which ledger to display
+if st.session_state.view_group and profile.get("group_code"):
+    df = load_group_ledger(profile["group_code"], my_uid)
+else:
+    df = load_ledger_data(my_uid)
+
+if "user_id" not in df.columns:
+    df["user_id"] = my_uid
 
 # ----------------------------------------------------------------------
 # ML PIPELINE
@@ -184,10 +358,14 @@ anomalies = df[df["anomaly"] == -1]
 # ----------------------------------------------------------------------
 # HEADER
 # ----------------------------------------------------------------------
-st.markdown("""
+group_badge = ""
+if st.session_state.view_group and profile.get("group_code"):
+    group_badge = f'<span class="group-view-badge">👨\u200d👩\u200d👧 Group View · {profile["group_code"]}</span>'
+
+st.markdown(f"""
 <div class="header-block">
-    <div class="app-title">Smart Expense Tracker</div>
-    <div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection</div>
+    <div class="app-title">Smart Expense Tracker {group_badge}</div>
+    <div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection · User ID: <b>{my_uid}</b></div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -252,9 +430,11 @@ if st.session_state.get("resolving_gap", False):
             })
             
             res_df = pd.DataFrame(new_rows)
-            st.session_state.data = pd.concat([st.session_state.data, res_df], ignore_index=True)
-            st.session_state.data = detect_anomalies(st.session_state.data)
-            save_ledger_data(st.session_state.data)
+            personal_df = load_ledger_data(my_uid)
+            personal_df = pd.concat([personal_df, res_df], ignore_index=True)
+            personal_df = detect_anomalies(personal_df)
+            save_ledger_data(personal_df, my_uid)
+            st.session_state.data = personal_df
             
             # Clear states
             st.session_state.resolving_gap = False
@@ -472,8 +652,13 @@ if selected_category != "All Categories":
     df_table = df_table[df_table["category"] == selected_category]
 df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
 
+# Show user_id column in group view so members can be distinguished
+table_cols = ["date", "description", "amount", "category", "anomaly"]
+if st.session_state.view_group and profile.get("group_code") and "user_id" in df_table.columns:
+    table_cols = ["user_id", "date", "description", "amount", "category", "anomaly"]
+
 st.dataframe(
-    df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
+    df_table.sort_values("date", ascending=False)[table_cols],
     use_container_width=True,
     height=300,
 )

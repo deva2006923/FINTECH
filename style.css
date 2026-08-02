@@ -276,3 +276,84 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     justify-content: space-between !important;
     color: #1B2A26 !important;
 }
+
+/* ---- SIDEBAR: Identity Badge ---- */
+.sidebar-badge {
+    background: rgba(212,175,55,0.08) !important;
+    border: 1px solid rgba(212,175,55,0.30) !important;
+    border-radius: 6px !important;
+    padding: 16px !important;          /* 8px multiple */
+    margin-bottom: 16px !important;    /* 8px multiple */
+    font-family: 'IBM Plex Mono', monospace !important;
+}
+.badge-label {
+    font-size: 12px !important;        /* Strict 12px label */
+    font-weight: 600 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: var(--gold) !important;
+    opacity: 0.75 !important;
+    margin-bottom: 8px !important;
+}
+.badge-uid {
+    font-size: 24px !important;        /* Multiple of 8 — prominent ID display */
+    font-weight: 700 !important;
+    letter-spacing: 0.16em !important;
+    color: var(--paper-cream) !important;
+    margin-bottom: 8px !important;
+}
+.badge-hint {
+    font-size: 12px !important;        /* Strict 12px label */
+    color: var(--sage) !important;
+    opacity: 0.75 !important;
+    line-height: 1.4 !important;
+}
+
+/* ---- SIDEBAR: Group Info Block ---- */
+.group-info {
+    background: rgba(124,152,133,0.10) !important;
+    border: 1px solid rgba(124,152,133,0.30) !important;
+    border-radius: 6px !important;
+    padding: 16px !important;          /* 8px multiple */
+    margin-bottom: 16px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;              /* 8px multiple */
+}
+.group-label {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: var(--sage) !important;
+    opacity: 0.80 !important;
+}
+.group-code {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.20em !important;
+    color: var(--paper-cream) !important;
+}
+.group-members {
+    font-size: 12px !important;
+    color: var(--sage) !important;
+    opacity: 0.75 !important;
+}
+
+/* ---- HEADER: Group View Indicator ---- */
+.group-view-badge {
+    display: inline-block !important;
+    background: rgba(124,152,133,0.15) !important;
+    border: 1px solid rgba(124,152,133,0.4) !important;
+    border-radius: 4px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: var(--sage) !important;
+    padding: 4px 12px !important;      /* 4px — half-grid, acceptable for badge pill */
+    margin-left: 16px !important;
+    vertical-align: middle !important;
+}
