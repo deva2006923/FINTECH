@@ -140,11 +140,11 @@ def load_ledger_data(uid):
             return df
         except Exception:
             pass
-    # Generate user-specific sample dataset
-    df = generate_sample_data(user_id=uid)
-    df["user_id"] = uid
+    # Default to an empty, user-scoped ledger for fresh accounts
+    df = pd.DataFrame(columns=["date", "description", "amount", "category", "anomaly", "user_id"])
     save_ledger_data(df, uid)
     return df
+
 
 
 
