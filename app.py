@@ -489,8 +489,48 @@ with col_right:
 
 # ---------------- FULL TABLE ----------------
 st.markdown('<div class="panel-title" style="margin-top:1.5rem;">All Transactions</div>', unsafe_allow_html=True)
+
+# Filters above the table
+col_filter1, col_filter2 = st.columns(2)
+with col_filter1:
+    unique_categories = sorted(df["category"].unique())
+    selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories))
+with col_filter2:
+    min_date = df["date"].min()
+    max_date = df["date"].max()
+    if pd.isnull(min_date):
+        min_date = datetime.today().date()
+    if pd.isnull(max_date):
+        max_date = datetime.today().date()
+    
+    date_range = st.date_input(
+        "Filter by Date Range",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+    )
+
+# Extract date bounds safely
+start_date = min_date
+end_date = max_date
+if isinstance(date_range, tuple):
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+    elif len(date_range) == 1:
+        start_date = date_range[0]
+        end_date = date_range[0]
+elif date_range:
+    start_date = date_range
+    end_date = date_range
+
+# Apply filters
+df_table = df.copy()
+if selected_category != "All Categories":
+    df_table = df_table[df_table["category"] == selected_category]
+df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
+
 st.dataframe(
-    df.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
+    df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
     use_container_width=True,
     height=300,
 )
