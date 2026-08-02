@@ -147,25 +147,45 @@ def get_group(group_id):
     return _load_groups().get(group_id)
 
 
-def invite_member(group_id, target_uid):
+def invite_member(group_id, target_input):
     """
-    Invite target_uid to group_id.
+    Invite target_input (Ledger ID, email, or username) to group_id.
     Returns one of: ok | not_found | already_member | already_invited
     """
     groups = _load_groups()
     group = groups.get(group_id)
     if not group:
         return "not_found"
-    if get_user_by_uid(target_uid) is None:
+    
+    users = _load_users()
+    target_uid = None
+    target_str = target_input.strip().lower()
+
+    # 1. Search by exact User ID
+    for ukey, uprof in users.items():
+        if uprof.get("user_id", "").lower() == target_str:
+            target_uid = uprof["user_id"]
+            break
+        if ukey.lower() == target_str:
+            target_uid = uprof["user_id"]
+            break
+        if uprof.get("email", "").lower() == target_str:
+            target_uid = uprof["user_id"]
+            break
+
+    if not target_uid:
         return "not_found"
+
     if target_uid in group["members"]:
         return "already_member"
     if target_uid in group.get("pending_invites", []):
         return "already_invited"
+        
     group.setdefault("pending_invites", []).append(target_uid)
     groups[group_id] = group
     _save_groups(groups)
     return "ok"
+
 
 
 def accept_invite(group_id, uid):
