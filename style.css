@@ -477,6 +477,20 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
 }
 
 /* ====================================================
+   GOOGLE OAUTH BUTTON FRONTEND STYLING
+   ==================================================== */
+iframe[title*="streamlit_oauth"], iframe[src*="oauth"] {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+iframe[title*="streamlit_oauth"]:hover, iframe[src*="oauth"]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(212,175,55,0.15) !important;
+}
+
+
+/* ====================================================
    AI ASSISTANT PANEL — distinct gold accent
    ==================================================== */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-panel-marker) {
