@@ -415,3 +415,224 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     line-height: 1.1 !important;
     font-family: 'IBM Plex Mono', monospace !important;
 }
+
+/* ====================================================
+   LOGIN PAGE
+   ==================================================== */
+.login-hero {
+    text-align: center !important;
+    padding: 48px 0 32px 0 !important;
+}
+.login-icon {
+    font-size: 56px !important;
+    line-height: 1 !important;
+    margin-bottom: 16px !important;
+}
+.login-hero-title {
+    font-size: 40px !important;
+    font-weight: 700 !important;
+    color: var(--paper-cream) !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    margin-bottom: 8px !important;
+    letter-spacing: -0.02em !important;
+}
+.login-hero-subtitle {
+    font-size: 15px !important;
+    color: var(--sage) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    letter-spacing: 0.04em !important;
+    opacity: 0.85 !important;
+}
+.login-feature-strip {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 24px !important;
+    margin-top: 24px !important;
+    flex-wrap: wrap !important;
+}
+.login-feature {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    background: rgba(242,236,221,0.05) !important;
+    border: 1px solid rgba(242,236,221,0.12) !important;
+    border-radius: 24px !important;
+    padding: 8px 16px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 12px !important;
+    color: var(--sage) !important;
+    letter-spacing: 0.06em !important;
+}
+.login-uid-info {
+    background: rgba(212,175,55,0.07) !important;
+    border: 1px solid rgba(212,175,55,0.22) !important;
+    border-radius: 6px !important;
+    padding: 16px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 12px !important;
+    color: var(--sage) !important;
+    text-align: center !important;
+    margin-top: 24px !important;
+    line-height: 1.6 !important;
+}
+
+/* ====================================================
+   AI ASSISTANT PANEL — distinct gold accent
+   ==================================================== */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-panel-marker) {
+    background: rgba(212,175,55,0.06) !important;
+    border: 1px solid rgba(212,175,55,0.22) !important;
+    border-left: 4px solid var(--gold) !important;
+    border-radius: 6px !important;
+    padding: 24px !important;
+    margin-bottom: 16px !important;
+}
+.ai-panel-title {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: var(--gold) !important;
+    margin-bottom: 8px !important;
+}
+.ai-panel-desc {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 13px !important;
+    color: var(--sage) !important;
+    opacity: 0.85 !important;
+    margin-bottom: 16px !important;
+    line-height: 1.5 !important;
+}
+.ai-chips {
+    display: flex !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    margin-bottom: 16px !important;
+}
+.ai-chip {
+    background: rgba(212,175,55,0.10) !important;
+    border: 1px solid rgba(212,175,55,0.28) !important;
+    border-radius: 16px !important;
+    padding: 5px 12px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 11px !important;
+    color: var(--gold) !important;
+    letter-spacing: 0.04em !important;
+    cursor: default !important;
+    opacity: 0.9 !important;
+}
+
+/* ====================================================
+   PENDING INVITE NOTIFICATION CARD
+   ==================================================== */
+.invite-card {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    background: rgba(212,175,55,0.07) !important;
+    border: 1px solid rgba(212,175,55,0.35) !important;
+    border-left: 4px solid var(--gold) !important;
+    border-radius: 8px !important;
+    padding: 16px 24px !important;
+    margin-bottom: 16px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    animation: slideIn 0.3s ease-out !important;
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.invite-icon {
+    font-size: 28px !important;
+    flex-shrink: 0 !important;
+}
+.invite-content {
+    flex: 1 !important;
+}
+.invite-title {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: var(--paper-cream) !important;
+    margin-bottom: 4px !important;
+}
+.invite-meta {
+    font-size: 12px !important;
+    color: var(--gold) !important;
+    opacity: 0.80 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+}
+
+/* ====================================================
+   SIDEBAR — Member List, Invite UX
+   ==================================================== */
+.member-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px dotted rgba(242,236,221,0.10) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 13px !important;
+}
+.member-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: rgba(124,152,133,0.25) !important;
+    border: 1px solid rgba(124,152,133,0.40) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: var(--sage) !important;
+    flex-shrink: 0 !important;
+}
+.member-name {
+    color: var(--paper-cream) !important;
+    font-weight: 500 !important;
+}
+.member-uid {
+    color: var(--sage) !important;
+    opacity: 0.65 !important;
+    font-size: 11px !important;
+}
+.member-host-tag {
+    background: rgba(212,175,55,0.15) !important;
+    border: 1px solid rgba(212,175,55,0.30) !important;
+    border-radius: 10px !important;
+    padding: 1px 7px !important;
+    font-size: 10px !important;
+    color: var(--gold) !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    margin-left: auto !important;
+}
+.sidebar-user-header {
+    background: rgba(242,236,221,0.05) !important;
+    border: 1px solid rgba(242,236,221,0.12) !important;
+    border-radius: 6px !important;
+    padding: 12px 16px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    margin-bottom: 8px !important;
+}
+.sidebar-uid-label {
+    font-size: 10px !important;
+    color: var(--sage) !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    opacity: 0.7 !important;
+}
+.sidebar-uid-value {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: var(--gold) !important;
+    letter-spacing: 0.15em !important;
+}
+.sidebar-name-value {
+    font-size: 13px !important;
+    color: var(--paper-cream) !important;
+    margin-top: 2px !important;
+}
