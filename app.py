@@ -308,42 +308,14 @@ def show_login_page():
 
         else:
             # Fallback Google Sign-In button if .env keys not loaded yet
-            st.markdown("<div style='margin-bottom:8px; font-size:12px; font-weight:600; color:var(--sage); opacity:0.8;'>SELECT TEST ACCOUNT</div>", unsafe_allow_html=True)
-            test_accounts = {
-                "devaprakassh49": "Deva (devaprakassh49@gmail.com)",
-                "sriram_thedev": "Sriram (sriram@gmail.com)",
-                "fakeman9080": "Fake Man (fakeman@gmail.com)",
-                "new_user": "🆕 Log in as a different member..."
-            }
-            selected_test = st.selectbox(
-                "account_selection",
-                options=list(test_accounts.keys()),
-                format_func=lambda x: test_accounts[x],
-                label_visibility="collapsed",
-                key="test_google_select"
-            )
-            
-            custom_username = ""
-            if selected_test == "new_user":
-                custom_username = st.text_input(
-                    "custom_account_name",
-                    placeholder="Enter username (e.g. mom_ledger)",
-                    label_visibility="collapsed",
-                    key="custom_account_name_in"
-                ).strip().lower()
-            
             if st.button("Continue with Google", key="google_fallback_btn", use_container_width=True):
-                target_user = custom_username if selected_test == "new_user" else selected_test
-                if not target_user:
-                    st.error("Please enter a username.")
-                else:
-                    google_user = _auth.login(target_user, "")
-                    if google_user:
-                        st.session_state.logged_in    = True
-                        st.session_state.auth_profile = google_user
-                        st.session_state.data         = None
-                        st.session_state.view_group   = False
-                        st.rerun()
+                google_user = _auth.login("devaprakassh49", "")
+                if google_user:
+                    st.session_state.logged_in    = True
+                    st.session_state.auth_profile = google_user
+                    st.session_state.data         = None
+                    st.session_state.view_group   = False
+                    st.rerun()
 
         # ── Footer note ───────────────────────────────────────────────
         st.markdown("""
