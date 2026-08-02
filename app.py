@@ -17,8 +17,10 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# Load credentials from .env (override any stale env vars)
-load_dotenv(override=True)
+# Load credentials from .env — use absolute path so it works regardless of CWD
+import pathlib as _pathlib
+_ENV_PATH = _pathlib.Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 # Import custom architecture modules
 import auth as _auth
@@ -222,12 +224,11 @@ def show_login_page():
                 revoke_token_endpoint  = _GOOGLE_REVOKE_URL,
             )
             google_result = _oauth.authorize_button(
-                name                = "Continue with Google",
-                redirect_uri        = _GOOGLE_REDIRECT_URI,
-                scope               = _GOOGLE_SCOPE,
-                key                 = "google_primary_btn",
-                use_container_width = True,
-                extras_params       = {"prompt": "select_account"},
+                name          = "Continue with Google",
+                redirect_uri  = _GOOGLE_REDIRECT_URI,
+                scope         = _GOOGLE_SCOPE,
+                key           = "google_primary_btn",
+                extras_params = {"prompt": "select_account"},
             )
 
             if google_result and "token" in google_result:
@@ -389,12 +390,11 @@ with st.sidebar:
                 revoke_token_endpoint  = _GOOGLE_REVOKE_URL,
             )
             _link_result = _link_oauth.authorize_button(
-                name         = "Connect Google",
-                redirect_uri = _GOOGLE_REDIRECT_URI,
-                scope        = _GOOGLE_SCOPE,
-                key          = "google_link_btn",
-                use_container_width = True,
-                extras_params= {"prompt": "select_account"},
+                name          = "Connect Google",
+                redirect_uri  = _GOOGLE_REDIRECT_URI,
+                scope         = _GOOGLE_SCOPE,
+                key           = "google_link_btn",
+                extras_params = {"prompt": "select_account"},
             )
             if _link_result and "token" in _link_result:
                 _lt      = _link_result["token"].get("id_token", "")
