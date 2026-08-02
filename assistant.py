@@ -101,6 +101,15 @@ def parse_natural_language_query(query, df, history=None):
             break
             
     # 3. Check query type
+    if any(term in query for term in ["pie chart", "pie"]):
+        return {
+            "type": "pie_chart",
+            "category": matched_category,
+            "start_date": start_date,
+            "end_date": end_date,
+            "query": query
+        }
+
     if any(term in query for term in ["bar graph", "bargraph", "chart", "graph", "plot", "bar chart"]):
         return {
             "type": "bar_chart",
@@ -183,6 +192,35 @@ def execute_assistant_query(parsed, df):
                         f"<div style='background:#D4AF37; width:{pct}%; height:100%;'></div></div></div>"
         else:
             resp += "*No transactions found in this date range to plot.*"
+        resp += "</div>"
+        return resp
+
+    elif q_type == "pie_chart":
+        filtered = df_eval.copy()
+        if parsed.get("category"):
+            filtered = filtered[filtered["category"] == parsed["category"]]
+        if parsed.get("start_date"):
+            filtered = filtered[(filtered["date_parsed"] >= parsed["start_date"]) & (filtered["date_parsed"] <= parsed["end_date"])]
+            
+        by_cat = filtered.groupby("category")["amount"].sum().sort_values(ascending=False)
+        total = by_cat.sum() if not by_cat.empty else 1.0
+        
+        resp = f"<div class='mono' style='font-size:0.85rem; line-height:1.4; color:#1B2A26;'>"
+        resp += f"Parsed Query: *{parsed['query']}*<br><br>"
+        resp += f"<strong>🥧 Category Breakdown (Pie Chart View):</strong><br><br>"
+        
+        colors = ["#D4AF37", "#7C9885", "#C1502E", "#2C3B37", "#4A6B6C", "#9A8C98", "#C9ADA7"]
+        if not by_cat.empty:
+            for i, (cat, amt) in enumerate(by_cat.items()):
+                pct = (amt / total * 100) if total > 0 else 0
+                color = colors[i % len(colors)]
+                resp += f"<div style='margin-bottom:8px;'>" \
+                        f"<div style='display:flex; justify-content:space-between; font-size:12px; font-weight:600;'>" \
+                        f"<span><span style='color:{color}; font-size:14px;'>●</span> {cat} ({pct:.1f}%)</span><span>₹{amt:,.2f}</span></div>" \
+                        f"<div style='background:rgba(212,175,55,0.1); border-radius:3px; height:8px; margin-top:2px;'>" \
+                        f"<div style='background:{color}; width:{pct:.1f}%; height:100%; border-radius:3px;'></div></div></div>"
+        else:
+            resp += "*No transactions found in this date range to display.*"
         resp += "</div>"
         return resp
 

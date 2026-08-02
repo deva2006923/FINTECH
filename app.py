@@ -771,108 +771,204 @@ if st.session_state.get("resolving_gap", False):
     st.stop()
 
 # ======================================================================
-# COLUMNS LAYOUT  (40 / 60 split)
 # ======================================================================
-col_left, col_right = st.columns([4, 6], gap="large")
+# NAVIGATION TABS (5 DEDICATED SECTIONS)
+# ======================================================================
+tab_dash, tab_add, tab_forecast, tab_ai, tab_family = st.tabs([
+    "📊 Dashboard Overview",
+    "📝 Add Expense (Log)",
+    "📈 Forecasting & Anomalies",
+    "💬 AI Assistant",
+    "👨‍👩‍👧 Family Tracker & Group ID"
+])
 
-# ── LEFT: Receipt Card ─────────────────────────────────────────────────
-with col_left:
-    rows_html = ""
-    for cat, amt in by_category.items():
-        rows_html += (
-            f'<div class="receipt-row">'
-            f'<span class="cat">{cat}</span>'
-            f'<span class="amt">₹{amt:,.2f}</span>'
-            f'</div>'
-        )
-        
-    member_html = ""
-    if st.session_state.view_group and current_group_id:
-        member_html += '<div class="receipt-header" style="margin-top:20px;"><div class="label">Member Breakdown</div></div>'
-        by_member = df.groupby("user_id")["amount"].sum().sort_values(ascending=False)
-        for uid, amt in by_member.items():
-            u_prof = _auth.get_user_by_uid(uid)
-            u_name = u_prof["display_name"] if u_prof else uid
-            member_html += (
-                f'<div class="receipt-row" style="opacity:0.8;">'
-                f'<span class="cat">👤 {u_name}</span>'
+# ── TAB 1: DASHBOARD OVERVIEW ──────────────────────────────────────────
+with tab_dash:
+    col_left, col_right = st.columns([4, 6], gap="large")
+
+    with col_left:
+        rows_html = ""
+        for cat, amt in by_category.items():
+            rows_html += (
+                f'<div class="receipt-row">'
+                f'<span class="cat">{cat}</span>'
                 f'<span class="amt">₹{amt:,.2f}</span>'
                 f'</div>'
             )
+            
+        member_html = ""
+        if st.session_state.view_group and current_group_id:
+            member_html += '<div class="receipt-header" style="margin-top:20px;"><div class="label">Member Breakdown</div></div>'
+            by_member = df.groupby("user_id")["amount"].sum().sort_values(ascending=False)
+            for uid, amt in by_member.items():
+                u_prof = _auth.get_user_by_uid(uid)
+                u_name = u_prof["display_name"] if u_prof else uid
+                member_html += (
+                    f'<div class="receipt-row" style="opacity:0.8;">'
+                    f'<span class="cat">👤 {u_name}</span>'
+                    f'<span class="amt">₹{amt:,.2f}</span>'
+                    f'</div>'
+                )
 
-    st.markdown(f"""
-    <div class="receipt">
-        <div class="receipt-header">
-            <div class="label">Total Spend · Last 90 Days</div>
-            <div class="amount">₹{total_spend:,.2f}</div>
-        </div>
-        {rows_html}
-        {member_html}
-        <div class="receipt-footer">*** Thank you for tracking responsibly ***</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 📊 Category Spending Bar Graph
-    with st.container(border=True):
-        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">📊 Category Spending Bar Graph</div>', unsafe_allow_html=True)
-        by_cat_df = df.groupby("category")["amount"].sum().reset_index()
-        if not by_cat_df.empty:
-            st.bar_chart(by_cat_df.set_index("category")["amount"], height=200)
-        else:
-            st.markdown('<span class="mono">No expense data available.</span>', unsafe_allow_html=True)
-
-# ── RIGHT: Card Stack ──────────────────────────────────────────────────
-with col_right:
-
-    # [1] Calendar Heatmap
-    with st.container(border=True):
-        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">📅 Calendar Heatmap (Last 90 Days)</div>', unsafe_allow_html=True)
-        st.markdown(generate_heatmap_html(df), unsafe_allow_html=True)
-        st.markdown("""
-        <div style="display:flex;justify-content:center;gap:8px;font-size:12px;
-                    font-family:'IBM Plex Mono',monospace;opacity:0.75;margin-top:8px;">
-            <span>Less</span>
-            <div style="width:12px;height:12px;background:#2c3b37;border-radius:2px;"></div>
-            <div style="width:12px;height:12px;background:rgba(124,152,133,0.25);border-radius:2px;"></div>
-            <div style="width:12px;height:12px;background:rgba(124,152,133,0.50);border-radius:2px;"></div>
-            <div style="width:12px;height:12px;background:rgba(124,152,133,0.75);border-radius:2px;"></div>
-            <div style="width:12px;height:12px;background:rgb(124,152,133);border-radius:2px;"></div>
-            <span>More</span>
+        st.markdown(f"""
+        <div class="receipt">
+            <div class="receipt-header">
+                <div class="label">Total Spend · Last 90 Days</div>
+                <div class="amount">₹{total_spend:,.2f}</div>
+            </div>
+            {rows_html}
+            {member_html}
+            <div class="receipt-footer">*** Thank you for tracking responsibly ***</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # [2] Forecast Chart
-    with st.container(border=True):
-        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">📈 Forecast — Next Period</div>', unsafe_allow_html=True)
-        chart_df = pd.concat([
-            daily.rename(columns={"amount": "Actual"})[["date", "Actual"]].set_index("date"),
-            forecast_df.rename(columns={"amount": "Forecast"})[["date", "Forecast"]].set_index("date"),
-        ], axis=0)
-        st.line_chart(chart_df, height=220)
-        st.markdown(
-            f'<span class="mono">Projected next {forecast_days} days: '
-            f'₹{forecast_df["amount"].sum():,.2f}</span>',
-            unsafe_allow_html=True,
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-title">📊 Category Spending Bar Graph</div>', unsafe_allow_html=True)
+            by_cat_df = df.groupby("category")["amount"].sum().reset_index()
+            if not by_cat_df.empty:
+                st.bar_chart(by_cat_df.set_index("category")["amount"], height=220)
+            else:
+                st.markdown('<span class="mono">No expense data available.</span>', unsafe_allow_html=True)
+
+    with col_right:
+        with st.container(border=True):
+            st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-title">📅 Calendar Heatmap (Last 90 Days)</div>', unsafe_allow_html=True)
+            st.markdown(generate_heatmap_html(df), unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">Ledger History & Search Filters</div>', unsafe_allow_html=True)
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            unique_categories = sorted(df["category"].unique())
+            selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories), key="cat_filt_dash")
+        with col_f2:
+            min_date = df["date"].min()
+            max_date = df["date"].max()
+            if pd.isnull(min_date): min_date = datetime.today().date()
+            if pd.isnull(max_date): max_date = datetime.today().date()
+            date_range = st.date_input("Filter by Date Range", value=(min_date, max_date), key="dt_filt_dash")
+
+        start_date, end_date = min_date, max_date
+        if isinstance(date_range, tuple):
+            if len(date_range) == 2: start_date, end_date = date_range
+            elif len(date_range) == 1: start_date = end_date = date_range[0]
+        elif date_range:
+            start_date = end_date = date_range
+
+        df_table = df.copy()
+        if selected_category != "All Categories":
+            df_table = df_table[df_table["category"] == selected_category]
+        df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
+
+        st.dataframe(
+            df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
+            use_container_width=True,
+            height=280,
         )
 
-    # [3] AI Ledger Assistant — GOLD ACCENT PANEL
+# ── TAB 2: ADD EXPENSE (LOG) ──────────────────────────────────────────
+with tab_add:
+    st.markdown('<div class="panel-title" style="margin-top:10px;">📝 Add New Daily Expense</div>', unsafe_allow_html=True)
+    with st.form("tab_daily_entry_form", clear_on_submit=True):
+        c_a, c_b = st.columns(2)
+        with c_a:
+            entry_date = st.date_input("Date", value=datetime.today().date(), key="tab_entry_date")
+            entry_desc = st.text_input("Description", placeholder="e.g. Dinner with friends", key="tab_entry_desc")
+        with c_b:
+            entry_amount = st.number_input("Amount (₹)", min_value=0.0, step=10.0, key="tab_entry_amount")
+            entry_category = st.selectbox("Category", ["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"], key="tab_entry_cat")
+            
+        submit_entry = st.form_submit_button("✚  Log Expense", use_container_width=True)
+
+    if submit_entry:
+        if not entry_desc.strip():
+            st.error("Please enter a description.")
+        elif entry_amount <= 0:
+            st.error("Amount must be greater than ₹0.")
+        else:
+            personal_df = load_ledger_data(my_uid)
+            new_row = pd.DataFrame([{
+                "date": entry_date, "description": entry_desc,
+                "amount": entry_amount, "category": entry_category,
+                "anomaly": 1, "user_id": my_uid,
+            }])
+            personal_df = pd.concat([personal_df, new_row], ignore_index=True)
+            personal_df = detect_anomalies(personal_df)
+            save_ledger_data(personal_df, my_uid)
+            st.session_state.data = personal_df
+            st.success(f"✅ Successfully logged ₹{entry_amount:,.2f} for {entry_desc}!")
+            st.rerun()
+
+# ── TAB 3: FORECASTING & ANOMALIES ────────────────────────────────────
+with tab_forecast:
+    col_fc1, col_fc2 = st.columns(2, gap="large")
+    with col_fc1:
+        with st.container(border=True):
+            st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-title">📈 Spending Forecast (Next Period)</div>', unsafe_allow_html=True)
+            chart_df = pd.concat([
+                daily.rename(columns={"amount": "Actual"})[["date", "Actual"]].set_index("date"),
+                forecast_df.rename(columns={"amount": "Forecast"})[["date", "Forecast"]].set_index("date"),
+            ], axis=0)
+            st.line_chart(chart_df, height=250)
+            st.markdown(
+                f'<span class="mono">Projected spend next {forecast_days} days: '
+                f'₹{forecast_df["amount"].sum():,.2f}</span>',
+                unsafe_allow_html=True,
+            )
+
+    with col_fc2:
+        with st.container(border=True):
+            st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-title">🚨 Anomaly Flags</div>', unsafe_allow_html=True)
+
+            if len(anomalies) == 0:
+                st.markdown('<span class="mono">No unusual transactions detected.</span>', unsafe_allow_html=True)
+            else:
+                normal_df = df[df["anomaly"] == 1]
+                category_averages = normal_df.groupby("category")["amount"].mean().to_dict() if not normal_df.empty else {}
+                overall_category_averages = df.groupby("category")["amount"].mean().to_dict()
+                global_average = df["amount"].mean()
+
+                for _, row in anomalies.sort_values("amount", ascending=False).iterrows():
+                    cat = row["category"]
+                    amt = row["amount"]
+                    cat_avg = category_averages.get(cat, overall_category_averages.get(cat, global_average))
+                    ratio = (amt / cat_avg) if cat_avg > 0 else 1.0
+
+                    if ratio >= 1.5:
+                        explanation = f"{ratio:.1f}x higher than {cat} avg (₹{cat_avg:,.2f})"
+                    else:
+                        explanation = f"Unusual pattern for {cat}"
+
+                    st.markdown(
+                        f'<div class="receipt-row" style="color:var(--paper-cream); align-items:center; padding:6px 0;">'
+                        f'<div style="display:flex;flex-direction:column;">'
+                        f'<span class="mono" style="font-weight:500;">{row["date"]} · {row["description"]}</span>'
+                        f'<span class="mono" style="font-size:12px;color:var(--gold);opacity:0.85;">→ {explanation}</span>'
+                        f'</div>'
+                        f'<span class="stamp">₹{row["amount"]:,.0f}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+
+# ── TAB 4: AI ASSISTANT ───────────────────────────────────────────────
+with tab_ai:
     with st.container(border=True):
         st.markdown('<div class="panel-marker ai-panel-marker"></div>', unsafe_allow_html=True)
         st.markdown('<div class="ai-panel-title">💬 AI Ledger Assistant</div>', unsafe_allow_html=True)
         st.markdown(
             '<div class="ai-panel-desc">'
-            'Ask me anything about your spending in plain English.'
+            'Ask me anything about your spending in plain English (e.g., "give me a bargraph", "pie chart", "top 3 expenses").'
             '</div>',
             unsafe_allow_html=True,
         )
 
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
-        
-        # Display history
+
         if st.session_state.chat_history:
             for msg in st.session_state.chat_history:
                 if msg["role"] == "user":
@@ -882,19 +978,18 @@ with col_right:
         else:
             st.markdown("""
             <div class="ai-chips">
-                <span class="ai-chip">How much on Food this month?</span>
+                <span class="ai-chip">bargraph for monthly expenses</span>
+                <span class="ai-chip">pie chart comparison</span>
                 <span class="ai-chip">Show my top 3 expenses</span>
                 <span class="ai-chip">Any unusual spending?</span>
-                <span class="ai-chip">Compare categories</span>
             </div>
             """, unsafe_allow_html=True)
 
-        query_input = st.chat_input("💬 Ask the Ledger AI...")
+        query_input = st.chat_input("💬 Ask the Ledger AI...", key="main_chat_input")
         if query_input:
             st.session_state.chat_history.append({"role": "user", "content": query_input})
             st.rerun()
 
-        # Check if we need to generate a response
         if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
             user_msg = st.session_state.chat_history[-1]["content"]
             with st.spinner("Analyzing ledger..."):
@@ -904,7 +999,6 @@ with col_right:
                 else:
                     response_html = run_open_ended_analysis(user_msg, df, api_key=api_key)
                 
-                # Append both the content and the parsed metadata for context
                 st.session_state.chat_history.append({
                     "role": "assistant", 
                     "content": response_html,
@@ -912,122 +1006,48 @@ with col_right:
                 })
             st.rerun()
 
-    # [4] Anomaly Flags + Performance Metrics
-    with st.container(border=True):
-        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title">🚨 Anomaly Flags &amp; Performance Metrics</div>', unsafe_allow_html=True)
+# ── TAB 5: FAMILY TRACKER & GROUP ID ──────────────────────────────────
+with tab_family:
+    col_g1, col_g2 = st.columns(2, gap="large")
+    with col_g1:
+        st.markdown('<div class="panel-title">👨‍👩‍👧 Join / Add Group by Ledger ID</div>', unsafe_allow_html=True)
+        with st.form("join_group_by_id_form"):
+            join_id = st.text_input("Enter 8-character Ledger ID", max_chars=8, placeholder="e.g. 450208EE").strip().upper()
+            join_submit = st.form_submit_button("➕ Connect & Send Invite", use_container_width=True)
 
-        if len(anomalies) == 0:
-            st.markdown('<span class="mono">No unusual transactions detected.</span>', unsafe_allow_html=True)
+        if join_submit:
+            if not join_id:
+                st.error("Please enter a valid Ledger ID.")
+            else:
+                curr_gid = st.session_state.get("active_group_id")
+                if not curr_gid:
+                    curr_gid = _auth.create_group(my_uid, profile.get("display_name", my_uid))
+                    st.session_state.active_group_id = curr_gid
+
+                res = _auth.invite_member(curr_gid, join_id)
+                if res == "ok":
+                    st.success(f"✅ Invitation sent to Ledger ID {join_id}!")
+                elif res == "not_found":
+                    st.error("Ledger ID not found. Verify the exact 8-character ID.")
+                elif res == "already_member":
+                    st.warning("User is already in your group.")
+                elif res == "already_invited":
+                    st.info("Invitation already sent.")
+
+    with col_g2:
+        st.markdown('<div class="panel-title">👥 Group Members & Ledger Switcher</div>', unsafe_allow_html=True)
+        if current_group_id:
+            gdata = _auth.get_group(current_group_id)
+            if gdata:
+                for uid in gdata.get("members", []):
+                    mp = _auth.get_user_by_uid(uid)
+                    m_name = mp["display_name"] if mp else uid
+                    is_me = (uid == my_uid)
+                    st.markdown(
+                        f'<div class="receipt-row" style="align-items:center; padding:8px 0;">'
+                        f'<span class="mono">👤 <b>{m_name}</b> {"(You)" if is_me else ""}</span>'
+                        f'<span class="mono" style="color:var(--gold);">{uid}</span></div>',
+                        unsafe_allow_html=True
+                    )
         else:
-            normal_df = df[df["anomaly"] == 1]
-            category_averages         = normal_df.groupby("category")["amount"].mean().to_dict() if not normal_df.empty else {}
-            overall_category_averages = df.groupby("category")["amount"].mean().to_dict()
-            global_average            = df["amount"].mean()
-
-            for _, row in anomalies.sort_values("amount", ascending=False).iterrows():
-                cat     = row["category"]
-                amt     = row["amount"]
-                cat_avg = category_averages.get(cat, overall_category_averages.get(cat, global_average))
-                ratio   = (amt / cat_avg) if cat_avg > 0 else 1.0
-
-                if cat in ["Other", "Uncategorized"]:
-                    explanation = (f"{ratio:.1f}x higher than baseline (₹{cat_avg:,.2f})"
-                                   if ratio >= 1.5 else "Unusual merchant descriptor pattern")
-                else:
-                    if ratio >= 1.5:
-                        explanation = f"{ratio:.1f}x higher than {cat} avg (₹{cat_avg:,.2f})"
-                    elif ratio <= 0.25 and ratio > 0:
-                        explanation = f"{1.0/ratio:.1f}x lower than {cat} avg (₹{cat_avg:,.2f})"
-                    else:
-                        explanation = f"Unusual timing pattern for {cat}"
-
-                st.markdown(
-                    f'<div class="receipt-row" style="color:var(--paper-cream);'
-                    f'border-bottom:1px dotted rgba(242,236,221,0.2);align-items:center;padding:8px 0;">'
-                    f'<div style="display:flex;flex-direction:column;">'
-                    f'<span class="mono" style="font-weight:500;">{row["date"]} · {row["description"]}</span>'
-                    f'<span class="mono" style="font-size:12px;color:var(--gold);opacity:0.85;margin-top:4px;">'
-                    f'→ {explanation}</span>'
-                    f'</div>'
-                    f'<span class="stamp">₹{row["amount"]:,.0f}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown('<hr style="border-top:1px dashed rgba(242,236,221,0.25);margin:16px 0;">', unsafe_allow_html=True)
-        st.markdown('<div class="panel-title" style="color:var(--gold);margin-bottom:8px;">Model Performance</div>', unsafe_allow_html=True)
-        if metrics is None:
-            st.markdown('<span class="mono" style="opacity:0.65;font-size:15px;">No evaluation metrics available.</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(
-                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);padding:8px 0;">'
-                f'<span class="mono" style="color:var(--gold);">Accuracy</span>'
-                f'<span class="mono" style="font-weight:700;">{metrics["accuracy"]*100:.1f}%</span></div>'
-                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);padding:8px 0;">'
-                f'<span class="mono" style="color:var(--gold);">Weighted F1-Score</span>'
-                f'<span class="mono" style="font-weight:700;">{metrics["f1"]:.3f}</span></div>'
-                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);padding:8px 0;">'
-                f'<span class="mono" style="color:var(--gold);">Weighted Precision</span>'
-                f'<span class="mono" style="font-weight:700;">{metrics["precision"]:.3f}</span></div>',
-                unsafe_allow_html=True,
-            )
-            labels = metrics["labels"]
-            cm     = metrics["confusion_matrix"]
-            header_cols = "".join(f'<th style="text-align:center;padding:4px;font-weight:600;border-bottom:1px solid rgba(242,236,221,0.25);font-size:12px;">{lbl[:4]}</th>' for lbl in labels)
-            thead = f'<thead><tr><th style="text-align:left;padding:4px;font-weight:600;border-bottom:1px solid rgba(242,236,221,0.25);font-size:12px;">True \\ Pred</th>{header_cols}</tr></thead>'
-            rows_html_cm = ""
-            for i, true_label in enumerate(labels):
-                cells = "".join(
-                    f'<td style="text-align:center;padding:4px;border-bottom:1px dotted rgba(242,236,221,0.1);font-size:12px;'
-                    f'background:{"rgba(124,152,133,0.15)" if i==j and cm[i][j]>0 else "none"};'
-                    f'color:{"var(--sage)" if i==j and cm[i][j]>0 else "var(--paper-cream)"};'
-                    f'font-weight:{"700" if i==j else "400"};">{cm[i][j]}</td>'
-                    for j in range(len(labels))
-                )
-                rows_html_cm += f'<tr><td style="text-align:left;padding:4px;border-bottom:1px dotted rgba(242,236,221,0.1);font-weight:600;text-transform:uppercase;font-size:12px;">{true_label[:4]}</td>{cells}</tr>'
-            st.markdown(
-                f'<div class="mono" style="font-size:12px;color:var(--gold);margin:16px 0 8px;text-transform:uppercase;letter-spacing:0.05em;">Confusion Matrix</div>'
-                f'<table class="mono" style="width:100%;border-collapse:collapse;color:var(--paper-cream);font-size:12px;">'
-                f'{thead}<tbody>{rows_html_cm}</tbody></table>',
-                unsafe_allow_html=True,
-            )
-
-# ======================================================================
-# LEDGER HISTORY — Full Width
-# ======================================================================
-st.markdown('<hr style="border-top:1px solid rgba(242,236,221,0.15);margin:32px 0;">', unsafe_allow_html=True)
-st.markdown('<div class="panel-title" style="margin-top:16px;">Ledger History &amp; Search Filters</div>', unsafe_allow_html=True)
-
-col_f1, col_f2 = st.columns(2)
-with col_f1:
-    unique_categories = sorted(df["category"].unique())
-    selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories))
-with col_f2:
-    min_date = df["date"].min()
-    max_date = df["date"].max()
-    if pd.isnull(min_date): min_date = datetime.today().date()
-    if pd.isnull(max_date): max_date = datetime.today().date()
-    date_range = st.date_input("Filter by Date Range", value=(min_date, max_date),
-                               min_value=min_date, max_value=max_date)
-
-start_date, end_date = min_date, max_date
-if isinstance(date_range, tuple):
-    if len(date_range) == 2: start_date, end_date = date_range
-    elif len(date_range) == 1: start_date = end_date = date_range[0]
-elif date_range:
-    start_date = end_date = date_range
-
-df_table = df.copy()
-if selected_category != "All Categories":
-    df_table = df_table[df_table["category"] == selected_category]
-df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
-
-table_cols = ["date", "description", "amount", "category", "anomaly"]
-if st.session_state.view_group and current_group_id and "user_id" in df_table.columns:
-    table_cols = ["user_id"] + table_cols
-
-st.dataframe(
-    df_table.sort_values("date", ascending=False)[table_cols],
-    use_container_width=True,
-    height=300,
-)
+            st.info("No active family group selected. Host or join a group to start tracking together!")
