@@ -308,6 +308,58 @@ def forecast_next_period(df, days_ahead=30):
     forecast_df = pd.DataFrame({"date": future_dates, "amount": np.clip(preds, 0, None)})
     return daily, forecast_df
 
+def validate_csv(uploaded_file):
+    try:
+        # Read file without parsing dates yet to prevent initial crash
+        df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        return False, None, f"❌ PARSE ERROR: The uploaded file is not a valid CSV format or is corrupted. Details: {str(e)}"
+    
+    if df.empty:
+        return False, None, "❌ LEDGER ERROR: The uploaded ledger file is empty. Please enter valid transaction lines."
+    
+    # Normalize column names to lowercase to be user friendly
+    df.columns = [c.lower() for c in df.columns]
+    
+    required_cols = ["date", "description", "amount"]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        return False, None, f"❌ LEDGER ERROR: Missing required column(s): {', '.join(missing_cols)}. Please verify your column headers."
+    
+    # Validate date
+    if df["date"].isna().any():
+        return False, None, "❌ ENTRY ERROR: Missing date(s) found. All ledger lines must have dates."
+    try:
+        parsed_dates = pd.to_datetime(df["date"], errors="coerce")
+        if parsed_dates.isna().any():
+            return False, None, "❌ ENTRY ERROR: Invalid or unparseable date format(s) found in the ledger. Dates must be in YYYY-MM-DD or standard parseable format."
+        # Assign parsed datetime
+        df["date"] = parsed_dates.dt.date
+    except Exception as e:
+        return False, None, f"❌ ENTRY ERROR: Date validation failed. Details: {str(e)}"
+    
+    # Validate description
+    if df["description"].isna().any() or (df["description"].astype(str).str.strip() == "").any():
+        return False, None, "❌ ENTRY ERROR: Missing transaction description(s) found. All ledger lines must have descriptions."
+    
+    # Validate amount
+    if df["amount"].isna().any():
+        return False, None, "❌ ENTRY ERROR: Missing transaction amount(s) found. All ledger lines must have amounts."
+    
+    # Ensure numeric
+    if not pd.api.types.is_numeric_dtype(df["amount"]):
+        try:
+            df["amount"] = pd.to_numeric(df["amount"], errors="raise")
+        except Exception:
+            return False, None, "❌ VALUE ERROR: Non-numeric values found in the amount column."
+    
+    # Check for negative amounts
+    negative_count = (df["amount"] < 0).sum()
+    if negative_count > 0:
+        return False, None, f"❌ AUDIT ERROR: Negative amount(s) detected ({negative_count} occurrences). Only positive expense records are accepted in this ledger."
+    
+    return True, df, None
+
 # ----------------------------------------------------------------------
 # SIDEBAR
 # ----------------------------------------------------------------------
@@ -322,14 +374,41 @@ with st.sidebar:
 if "data" not in st.session_state:
     st.session_state.data = None
 
+# Process uploaded file with change tracking
 if uploaded is not None:
-    raw = pd.read_csv(uploaded, parse_dates=["date"])
-    raw["date"] = raw["date"].dt.date
-    st.session_state.data = raw
-elif use_sample or st.session_state.data is None:
-    st.session_state.data = generate_sample_data()
+    file_key = f"{uploaded.name}_{uploaded.size}"
+    if st.session_state.get("last_uploaded_key") != file_key:
+        st.session_state.last_uploaded_key = file_key
+        st.session_state.force_sample = False
+        is_valid, validated_df, error_msg = validate_csv(uploaded)
+        if is_valid:
+            st.session_state.data = validated_df
+            st.session_state.csv_error = None
+        else:
+            st.session_state.csv_error = error_msg
+            st.session_state.data = None
 
-df = st.session_state.data.copy()
+if use_sample:
+    st.session_state.data = generate_sample_data()
+    st.session_state.csv_error = None
+    st.session_state.force_sample = True
+
+# Fallback check
+if st.session_state.get("force_sample", False):
+    if st.session_state.data is None:
+        st.session_state.data = generate_sample_data()
+else:
+    if uploaded is None and st.session_state.data is None:
+        st.session_state.data = generate_sample_data()
+
+csv_error = st.session_state.get("csv_error", None)
+
+# If validation failed and we have no data, set placeholder df so execution doesn't crash before header renders
+if st.session_state.data is not None:
+    df = st.session_state.data.copy()
+else:
+    # Minimal dummy dataframe to allow initial downstream code to read, but it will stop rendering at header anyway
+    df = pd.DataFrame(columns=["date", "description", "amount", "category", "anomaly"])
 
 # ----------------------------------------------------------------------
 # ML PIPELINE
@@ -348,6 +427,15 @@ anomalies = df[df["anomaly"] == -1]
 # ----------------------------------------------------------------------
 st.markdown('<div class="app-title">Smart Expense Tracker</div>', unsafe_allow_html=True)
 st.markdown('<div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection</div>', unsafe_allow_html=True)
+
+if csv_error is not None:
+    st.markdown(f"""
+    <div class="panel" style="border: 1px solid var(--stamp-red); background: rgba(193,80,46,0.05); margin-bottom: 2rem;">
+        <div class="panel-title" style="color: var(--stamp-red);">Ledger Validation Error</div>
+        <span class="mono" style="color: var(--paper-cream); font-size: 0.9rem;">{csv_error}</span>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
 
 col_left, col_right = st.columns([1.1, 1.5], gap="large")
 
