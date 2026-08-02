@@ -308,13 +308,39 @@ def show_login_page():
 
         else:
             # Fallback Google Sign-In button if .env keys not loaded yet
-            if st.button("Continue with Google", key="google_fallback_btn", use_container_width=True):
-                google_user = _auth.login("devaprakassh49", "")
-                if google_user:
-                    st.session_state.logged_in    = True
-                    st.session_state.auth_profile = google_user
-                    st.session_state.data         = None
-                    st.session_state.view_group   = False
+            if "show_mock_dialog" not in st.session_state:
+                st.session_state.show_mock_dialog = False
+
+            if st.session_state.show_mock_dialog:
+                st.markdown("<div style='margin-bottom:12px; background:rgba(212,175,55,0.08); padding:16px; border-radius:8px; border:1px solid rgba(212,175,55,0.25); text-align:left;'>", unsafe_allow_html=True)
+                st.markdown("<b style='color:var(--gold); font-size:14px;'>Simulating Google Account Selection</b>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:12px; color:var(--sage); margin-top:4px; margin-bottom:12px;'>Enter any Gmail address to simulate logging in with different accounts.</div>", unsafe_allow_html=True)
+                
+                gmail_in = st.text_input("Gmail Address", placeholder="name@gmail.com", key="gmail_input_fallback").strip().lower()
+                
+                c_sub1, c_sub2 = st.columns(2)
+                with c_sub1:
+                    if st.button("Sign In", key="submit_mock_signin", use_container_width=True):
+                        if not gmail_in:
+                            st.error("Please enter a valid email.")
+                        else:
+                            user_part = gmail_in.split("@")[0]
+                            google_user = _auth.login(user_part, "")
+                            if google_user:
+                                st.session_state.logged_in    = True
+                                st.session_state.auth_profile = google_user
+                                st.session_state.data         = None
+                                st.session_state.view_group   = False
+                                st.session_state.show_mock_dialog = False
+                                st.rerun()
+                with c_sub2:
+                    if st.button("Cancel", key="cancel_mock_signin", use_container_width=True):
+                        st.session_state.show_mock_dialog = False
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                if st.button("Continue with Google", key="google_fallback_btn", use_container_width=True):
+                    st.session_state.show_mock_dialog = True
                     st.rerun()
 
         # ── Footer note ───────────────────────────────────────────────
