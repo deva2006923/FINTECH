@@ -215,7 +215,7 @@ section[data-testid="stSidebar"] * {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Supplemental style block to fix Streamlit's st.container(border=True) rendering for panel styling
+# Supplemental style block to fix Streamlit's st.container(border=True) rendering and heatmap styling
 PANEL_FIX_CSS = """
 <style>
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) {
@@ -227,6 +227,70 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) {
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     padding: 0 !important;
+}
+
+/* Heatmap Container */
+.heatmap-scroll-container {
+    overflow-x: auto;
+    width: 100%;
+    padding: 0.5rem 0;
+    margin: 1rem 0;
+}
+.heatmap-cell {
+    position: relative;
+    cursor: pointer;
+}
+/* Tooltip styling matching physical receipt */
+.heatmap-cell .tooltip {
+    visibility: hidden;
+    width: 190px;
+    background-color: var(--paper-cream) !important;
+    color: #1B2A26 !important;
+    text-align: left;
+    border: 1px solid rgba(27, 42, 38, 0.2) !important;
+    border-radius: 4px !important;
+    padding: 10px !important;
+    position: absolute;
+    z-index: 999 !important;
+    bottom: 130%;
+    left: 50%;
+    margin-left: -95px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.72rem !important;
+}
+.heatmap-cell:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+/* Mini Receipt Aesthetics */
+.mini-receipt-title {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    border-bottom: 1px dashed #1B2A26 !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+    color: #1B2A26 !important;
+    text-transform: uppercase;
+}
+.mini-receipt-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    line-height: 1.1;
+    color: #1B2A26 !important;
+}
+.mini-receipt-total {
+    border-top: 1px dashed #1B2A26 !important;
+    margin-top: 6px !important;
+    padding-top: 4px !important;
+    font-weight: 700 !important;
+    display: flex;
+    justify-content: space-between;
+    color: #1B2A26 !important;
 }
 </style>
 """
@@ -404,6 +468,116 @@ def forecast_next_period(df, days_ahead=30):
     future_dates = [last_date + timedelta(days=int(i) + 1) for i in range(days_ahead)]
     forecast_df = pd.DataFrame({"date": future_dates, "amount": np.clip(preds, 0, None)})
     return daily, forecast_df
+
+def generate_heatmap_html(df):
+    df_heatmap = df.copy()
+    # Ensure dates are parsed to datetime.date objects
+    df_heatmap["date_parsed"] = pd.to_datetime(df_heatmap["date"]).dt.date
+    
+    # Group spend by date
+    daily_spend = df_heatmap.groupby("date_parsed")["amount"].sum().to_dict()
+    
+    # Group transactions by date
+    daily_txns = {}
+    for date_obj, group in df_heatmap.groupby("date_parsed"):
+        daily_txns[date_obj] = group[["description", "amount"]].to_dict("records")
+        
+    if not daily_spend:
+        return "<div class='mono' style='color:var(--paper-cream); opacity:0.6;'>No transaction data available for heatmap.</div>"
+        
+    max_date = max(daily_spend.keys())
+    min_date = min(daily_spend.keys())
+    
+    # Range of 90 days
+    end_date = max_date
+    start_date = end_date - timedelta(days=90)
+    
+    # Align to start of the week (Monday)
+    start_weekday = start_date.weekday() # Mon=0, Sun=6
+    grid_start = start_date - timedelta(days=start_weekday)
+    
+    # Align end to Sunday
+    end_weekday = end_date.weekday()
+    grid_end = end_date + timedelta(days=(6 - end_weekday))
+    
+    weeks = []
+    curr = grid_start
+    while curr <= grid_end:
+        week_dates = []
+        for _ in range(7):
+            week_dates.append(curr)
+            curr += timedelta(days=1)
+        weeks.append(week_dates)
+        
+    non_zero_spends = [v for v in daily_spend.values() if v > 0]
+    if non_zero_spends:
+        q25 = np.percentile(non_zero_spends, 25)
+        q50 = np.percentile(non_zero_spends, 50)
+        q75 = np.percentile(non_zero_spends, 75)
+    else:
+        q25, q50, q75 = 100, 500, 1500
+        
+    def get_level(amt):
+        if amt == 0:
+            return 0
+        elif amt <= q25:
+            return 1
+        elif amt <= q50:
+            return 2
+        elif amt <= q75:
+            return 3
+        else:
+            return 4
+            
+    colors = {
+        0: "#2c3b37",
+        1: "rgba(124, 152, 133, 0.25)",
+        2: "rgba(124, 152, 133, 0.5)",
+        3: "rgba(124, 152, 133, 0.75)",
+        4: "rgb(124, 152, 133)"
+    }
+    
+    day_names = ["Mon", "", "Wed", "", "Fri", "", "Sun"]
+    rows_html = ""
+    for d_idx in range(7):
+        row_cells = f'<td style="font-family:\'Space Grotesk\', sans-serif; font-size:0.7rem; color:var(--paper-cream); opacity:0.6; padding-right:8px; text-align:right; vertical-align:middle; line-height:14px; min-width:24px;">{day_names[d_idx]}</td>'
+        for week in weeks:
+            date_obj = week[d_idx]
+            amt = daily_spend.get(date_obj, 0.0)
+            level = get_level(amt)
+            bg_color = colors[level]
+            
+            txns = daily_txns.get(date_obj, [])
+            txn_rows_html = ""
+            for t in txns[:5]:
+                txn_rows_html += f'<div class="mini-receipt-row"><span>{t["description"][:16]}</span><span>₹{t["amount"]:,.0f}</span></div>'
+            if len(txns) > 5:
+                txn_rows_html += f'<div class="mini-receipt-row" style="opacity:0.6;"><span>... +{len(txns)-5} more</span></div>'
+                
+            tooltip_html = f"""
+            <span class="tooltip">
+                <div class="mini-receipt-title">{date_obj.strftime('%b %d, %Y')}</div>
+                {txn_rows_html if txns else '<div class="mini-receipt-row" style="opacity:0.6;">No activity</div>'}
+                <div class="mini-receipt-total"><span>Total Spend</span><span>₹{amt:,.2f}</span></div>
+            </span>
+            """
+            
+            if date_obj < min_date or date_obj > max_date:
+                row_cells += f'<td style="width:14px; height:14px; background:transparent; border-radius:2px;"></td>'
+            else:
+                row_cells += f'<td class="heatmap-cell" style="width:14px; height:14px; background:{bg_color}; border-radius:2px; position:relative;">{tooltip_html}</td>'
+        rows_html += f'<tr>{row_cells}</tr>'
+        
+    heatmap_table = f"""
+    <div class="heatmap-scroll-container">
+        <table style="border-collapse:separate; border-spacing:3px; margin:0 auto;">
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+    """
+    return heatmap_table
 
 def validate_csv(uploaded_file):
     try:
