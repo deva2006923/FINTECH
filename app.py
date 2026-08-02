@@ -17,8 +17,8 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# Load credentials from .env (if present)
-load_dotenv()
+# Load credentials from .env (override any stale env vars)
+load_dotenv(override=True)
 
 # Import custom architecture modules
 import auth as _auth
@@ -169,12 +169,14 @@ if "auth_profile" not in st.session_state:
 
 
 def show_login_page():
-    """Render the full-screen login / registration page."""
+    """Premium login page — Google is the primary (and only) sign-in method."""
     # Hide sidebar on login page
-    st.markdown("<style>section[data-testid='stSidebar']{display:none!important}</style>",
-                unsafe_allow_html=True)
+    st.markdown(
+        "<style>section[data-testid='stSidebar']{display:none!important}</style>",
+        unsafe_allow_html=True,
+    )
 
-    # Hero banner
+    # ── Hero ────────────────────────────────────────────────────────
     st.markdown("""
     <div class="login-hero">
         <div class="login-icon">🧾</div>
@@ -190,21 +192,93 @@ def show_login_page():
     </div>
     """, unsafe_allow_html=True)
 
-    # Center the form
-    _, form_col, _ = st.columns([1, 2, 1])
-    with form_col:
-        tab_in, tab_reg, tab_google = st.tabs([
-            "🔑  Sign In",
-            "✨  Create Account",
-            "🔵  Google",
-        ])
+    # ── Center column ───────────────────────────────────────────────
+    _, col, _ = st.columns([1, 1.4, 1])
+    with col:
 
-        # ── Sign In ──────────────────────────────────────────────────
-        with tab_in:
+        # Card title
+        st.markdown("""
+        <div style="text-align:center; padding:8px 0 24px 0;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:22px;
+                        font-weight:700; color:var(--paper-cream); margin-bottom:8px;">
+                Sign in to get started
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:13px;
+                        color:var(--sage); opacity:0.8; line-height:1.6;">
+                New? Your unique <b style="color:var(--gold);">Ledger ID</b>
+                is created automatically on first sign-in.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── PRIMARY: Google Sign-In ──────────────────────────────────
+        if _OAUTH_AVAILABLE and _GOOGLE_CLIENT_ID and _GOOGLE_CLIENT_SECRET:
+            _oauth = _OAuth2Component(
+                client_id              = _GOOGLE_CLIENT_ID,
+                client_secret          = _GOOGLE_CLIENT_SECRET,
+                authorize_endpoint     = _GOOGLE_AUTH_URL,
+                token_endpoint         = _GOOGLE_TOKEN_URL,
+                refresh_token_endpoint = _GOOGLE_TOKEN_URL,
+                revoke_token_endpoint  = _GOOGLE_REVOKE_URL,
+            )
+            google_result = _oauth.authorize_button(
+                name                = "Continue with Google",
+                redirect_uri        = _GOOGLE_REDIRECT_URI,
+                scope               = _GOOGLE_SCOPE,
+                key                 = "google_primary_btn",
+                use_container_width = True,
+                extras_params       = {"prompt": "select_account"},
+            )
+
+            if google_result and "token" in google_result:
+                _id_token = google_result["token"].get("id_token", "")
+                _payload  = _auth.decode_google_id_token(_id_token)
+                if _payload:
+                    _gid     = _payload.get("sub", "")
+                    _email   = _payload.get("email", "")
+                    _gname   = _payload.get("name", _email)
+                    _picture = _payload.get("picture", "")
+                    _profile = _auth.register_or_login_google(_gid, _email, _gname, _picture)
+                    if _profile:
+                        st.session_state.logged_in    = True
+                        st.session_state.auth_profile = _profile
+                        st.session_state.data         = None
+                        st.session_state.view_group   = False
+                        st.rerun()
+                    else:
+                        st.error("Something went wrong. Please try again.")
+                else:
+                    st.error("Could not verify Google token. Please try again.")
+
+        else:
+            # Google not configured yet
+            st.markdown("""
+            <div class="login-uid-info" style="text-align:center; padding:24px;">
+                <div style="font-size:32px; margin-bottom:12px;">🔵</div>
+                <b style="color:var(--gold); font-size:15px;">Google Sign-In is not configured.</b><br><br>
+                Add credentials to the <code>.env</code> file and restart:<br><br>
+                <code style="font-size:12px;">GOOGLE_CLIENT_ID=...apps.googleusercontent.com</code><br>
+                <code style="font-size:12px;">GOOGLE_CLIENT_SECRET=your_secret</code>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── Divider ──────────────────────────────────────────────────
+        st.markdown("""
+        <div style="display:flex; align-items:center; gap:12px; margin:20px 0;">
+            <div style="flex:1; height:1px; background:rgba(242,236,221,0.12);"></div>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:11px;
+                         color:var(--sage); opacity:0.6; text-transform:uppercase;
+                         letter-spacing:0.10em;">existing account</span>
+            <div style="flex:1; height:1px; background:rgba(242,236,221,0.12);"></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── FALLBACK: Password sign-in (existing accounts only) ──────
+        with st.expander("Sign in with username & password"):
             with st.form("login_form", clear_on_submit=False):
                 username_in = st.text_input("Username", placeholder="your_username")
                 password_in = st.text_input("Password", type="password", placeholder="••••••••")
-                login_btn   = st.form_submit_button("Sign In →", use_container_width=True)
+                login_btn   = st.form_submit_button("Sign In", use_container_width=True)
 
             if login_btn:
                 if not username_in.strip():
@@ -218,108 +292,17 @@ def show_login_page():
                         st.session_state.view_group   = False
                         st.rerun()
                     else:
-                        st.error("❌ Invalid username or password. Try again.")
+                        st.error("Invalid username or password.")
 
-        # ── Create Account ────────────────────────────────────────────
-        with tab_reg:
-            with st.form("register_form", clear_on_submit=True):
-                new_username     = st.text_input("Username", placeholder="choose a username", key="reg_user")
-                new_display_name = st.text_input("Display Name", placeholder="e.g. Alice", key="reg_name")
-                new_password     = st.text_input("Password", type="password", placeholder="min. 6 chars", key="reg_pw")
-                new_password2    = st.text_input("Confirm Password", type="password", placeholder="repeat password", key="reg_pw2")
-                register_btn     = st.form_submit_button("Create My Account →", use_container_width=True)
-
-            if register_btn:
-                if not new_username.strip():
-                    st.error("Username is required.")
-                elif len(new_password) < 6:
-                    st.error("Password must be at least 6 characters.")
-                elif new_password != new_password2:
-                    st.error("Passwords do not match.")
-                else:
-                    result = _auth.register(new_username, new_password, new_display_name)
-                    if result:
-                        st.session_state.logged_in    = True
-                        st.session_state.auth_profile = result
-                        st.session_state.data         = None
-                        st.session_state.view_group   = False
-                        st.success(f"Account created! Your Ledger ID: **{result['user_id']}**")
-                        st.rerun()
-                    else:
-                        st.error("Username already taken. Please choose a different one.")
-
-        # ── Google Sign In ────────────────────────────────────────────
-        with tab_google:
-            if not _OAUTH_AVAILABLE or not _GOOGLE_CLIENT_ID or not _GOOGLE_CLIENT_SECRET:
-                # Credentials not configured — show setup instructions
-                st.markdown("""
-                <div class="login-uid-info" style="text-align:left; padding:20px;">
-                    <b style="color:var(--gold);">Google Sign-In not configured.</b><br><br>
-                    Add your credentials to the <code>.env</code> file:<br><br>
-                    <code>GOOGLE_CLIENT_ID=....apps.googleusercontent.com</code><br>
-                    <code>GOOGLE_CLIENT_SECRET=your_secret</code><br><br>
-                    Then restart the app.
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                <div style="text-align:center; padding:16px 0 24px 0; font-family:'IBM Plex Mono',monospace;
-                            font-size:13px; color:var(--sage); opacity:0.85;">
-                    One click — no username or password needed.<br>
-                    Your Google account will be linked to a unique Ledger ID.
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Build the OAuth2 component
-                _oauth = _OAuth2Component(
-                    client_id     = _GOOGLE_CLIENT_ID,
-                    client_secret = _GOOGLE_CLIENT_SECRET,
-                    authorize_endpoint = _GOOGLE_AUTH_URL,
-                    token_endpoint     = _GOOGLE_TOKEN_URL,
-                    refresh_token_endpoint = _GOOGLE_TOKEN_URL,
-                    revoke_token_endpoint  = _GOOGLE_REVOKE_URL,
-                )
-
-                google_result = _oauth.authorize_button(
-                    name         = "Sign in with Google",
-                    redirect_uri = _GOOGLE_REDIRECT_URI,
-                    scope        = _GOOGLE_SCOPE,
-                    key          = "google_oauth_btn",
-                    use_container_width = True,
-                    extras_params= {"prompt": "select_account"},  # always show account picker
-                )
-
-                if google_result and "token" in google_result:
-                    _id_token = google_result["token"].get("id_token", "")
-                    _payload  = _auth.decode_google_id_token(_id_token)
-                    if _payload:
-                        _google_id = _payload.get("sub", "")
-                        _email     = _payload.get("email", "")
-                        _gname     = _payload.get("name", _email)
-                        _picture   = _payload.get("picture", "")
-
-                        _profile = _auth.register_or_login_google(
-                            _google_id, _email, _gname, _picture
-                        )
-                        if _profile:
-                            st.session_state.logged_in    = True
-                            st.session_state.auth_profile = _profile
-                            st.session_state.data         = None
-                            st.session_state.view_group   = False
-                            st.success(f"Welcome, {_gname}! Your Ledger ID: **{_profile['user_id']}**")
-                            st.rerun()
-                        else:
-                            st.error("Something went wrong creating your account. Please try again.")
-                    else:
-                        st.error("Could not decode Google token. Please try again.")
-
-        # ── Info note ─────────────────────────────────────────────────
+        # ── Footer note ───────────────────────────────────────────────
         st.markdown("""
-        <div class="login-uid-info">
-            🪪 &nbsp;Each account gets a unique <b>Ledger ID</b> on registration.<br>
-            Share it with family members so they can invite you to their group.
+        <div style="text-align:center; margin-top:16px; font-family:'IBM Plex Mono',monospace;
+                    font-size:11px; color:var(--sage); opacity:0.55; line-height:1.6;">
+            By signing in you agree to keep your data private and not share credentials.<br>
+            Your Ledger ID will appear on your dashboard after sign-in.
         </div>
         """, unsafe_allow_html=True)
+
 
 
 
