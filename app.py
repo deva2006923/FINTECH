@@ -279,12 +279,22 @@ def show_login_page():
         </div>
         """, unsafe_allow_html=True)
 
+        # ── QUICK DEMO SIGN-IN ──────────────────────────────────────
+        if st.button("⚡ Quick Demo Sign-In", key="quick_demo_btn", use_container_width=True):
+            demo_user = _auth.login("demo_user", "")
+            if demo_user:
+                st.session_state.logged_in    = True
+                st.session_state.auth_profile = demo_user
+                st.session_state.data         = None
+                st.session_state.view_group   = False
+                st.rerun()
+
         # ── FALLBACK: Password sign-in (existing accounts only) ──────
         with st.expander("Sign in with username & password"):
             with st.form("login_form", clear_on_submit=False):
                 username_in = st.text_input("Username", placeholder="your_username")
                 password_in = st.text_input("Password", type="password", placeholder="••••••••")
-                login_btn   = st.form_submit_button("Sign In", use_container_width=True)
+                login_btn   = st.form_submit_button("Sign In / Sign Up", use_container_width=True)
 
             if login_btn:
                 if not username_in.strip():

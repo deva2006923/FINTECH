@@ -76,18 +76,40 @@ def register(username, password, display_name):
     return profile
 
 
-def login(username, password):
+def login(username, password=""):
     """
-    Authenticate a user.
+    Authenticate or auto-register a user.
     Returns the profile dict on success, None on failure.
     """
     users = _load_users()
     key = username.strip().lower()
+    if not key:
+        return None
+        
     user = users.get(key)
     if not user:
+        # Auto register new user
+        uid = uuid.uuid4().hex[:8].upper()
+        profile = {
+            "user_id":       uid,
+            "password_hash": _hash(password) if password else None,
+            "display_name":  username.strip(),
+            "groups":        [],
+        }
+        users[key] = profile
+        _save_users(users)
+        return dict(profile)
+        
+    if user.get("password_hash") is None:
+        if password:
+            user["password_hash"] = _hash(password)
+            users[key] = user
+            _save_users(users)
+        return dict(user)
+
+    if user.get("password_hash") != _hash(password):
         return None
-    if user["password_hash"] != _hash(password):
-        return None
+        
     return dict(user)
 
 
