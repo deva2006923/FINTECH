@@ -129,6 +129,49 @@ def save_ledger_data(df, uid):
     df.to_csv(get_user_ledger_path(uid), index=False)
 
 
+def generate_90_day_synthetic_ledger(uid):
+    import random
+    descriptions = [
+        ("Electric Bill", 1200, "Bills"),
+        ("Water Bill", 450, "Bills"),
+        ("Netflix Subscription", 199, "Entertainment"),
+        ("Spotify Premium", 119, "Entertainment"),
+        ("Uber Ride", 350, "Travel"),
+        ("Ola Cab", 280, "Travel"),
+        ("Petrol Refuel", 1500, "Travel"),
+        ("Starbucks Coffee", 450, "Food"),
+        ("Dinner at restaurant", 1200, "Food"),
+        ("Swiggy Order", 650, "Food"),
+        ("Zomato Delivery", 800, "Food"),
+        ("Weekly Groceries", 2200, "Food"),
+        ("Pharmacy Medicine", 350, "Health"),
+        ("Doctor Consultation", 800, "Health"),
+        ("Amazon Shopping", 1850, "Shopping"),
+        ("Flipkart Order", 1200, "Shopping"),
+        ("Movie Ticket", 350, "Entertainment"),
+        ("Gym Membership", 1500, "Health")
+    ]
+    rows = []
+    today = datetime.today().date()
+    for i in range(25):
+        days_ago = random.randint(1, 90)
+        txn_date = today - timedelta(days=days_ago)
+        desc, base_amt, cat = random.choice(descriptions)
+        amt = round(base_amt * random.uniform(0.8, 1.2), 2)
+        rows.append({
+            "date": txn_date,
+            "description": desc,
+            "amount": amt,
+            "category": cat,
+            "anomaly": 1,
+            "user_id": uid
+        })
+    df = pd.DataFrame(rows)
+    df = df.sort_values("date").reset_index(drop=True)
+    df = detect_anomalies(df)
+    return df
+
+
 def load_ledger_data(uid):
     path = get_user_ledger_path(uid)
     if os.path.exists(path):
@@ -142,8 +185,8 @@ def load_ledger_data(uid):
             return df
         except Exception:
             pass
-    # Default to an empty, user-scoped ledger for fresh accounts
-    df = pd.DataFrame(columns=["date", "description", "amount", "category", "anomaly", "user_id"])
+    # Generate rich 90-day historical data so fresh accounts aren't empty
+    df = generate_90_day_synthetic_ledger(uid)
     save_ledger_data(df, uid)
     return df
 
@@ -537,13 +580,7 @@ with st.sidebar:
 
     # ── Settings ────────────────────────────────────────────────────
     forecast_days = st.slider("Forecast horizon (days)", 7, 60, 30)
-    st.markdown("---")
-    api_key = st.text_input(
-        "Gemini API Key",
-        type="password",
-        value=os.environ.get("GEMINI_API_KEY", ""),
-        help="Required for open-ended AI questions."
-    )
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     st.markdown("---")
 
     # ── Daily Expense Entry Form ────────────────────────────────────
@@ -797,17 +834,8 @@ with tab_dash:
                     f'</div>'
                 )
 
-        st.markdown(f"""
-        <div class="receipt">
-            <div class="receipt-header">
-                <div class="label">Total Spend · Last 90 Days</div>
-                <div class="amount">₹{total_spend:,.2f}</div>
-            </div>
-            {rows_html}
-            {member_html}
-            <div class="receipt-footer">★ Thank you for tracking responsibly ★</div>
-        </div>
-        """, unsafe_allow_html=True)
+        receipt_html = f"""<div class="receipt"><div class="receipt-header"><div class="label">Total Spend · Last 90 Days</div><div class="amount">₹{total_spend:,.2f}</div></div>{rows_html}{member_html}<div class="receipt-footer">★ Thank you for tracking responsibly ★</div></div>"""
+        st.markdown(receipt_html, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         with st.container(border=True):
@@ -1034,18 +1062,8 @@ with tab_family:
                     f'</div>'
                 )
                 
-            st.markdown(f"""
-            <div class="receipt">
-                <div class="receipt-header">
-                    <div class="label">Family Total Spend · Last 90 Days</div>
-                    <div class="amount">₹{g_total_spend:,.2f}</div>
-                </div>
-                {rows_fam_html}
-                <div class="receipt-header" style="margin-top:20px;"><div class="label">Member Contribution</div></div>
-                {member_breakdown_html}
-                <div class="receipt-footer">★ Connected Family Ledger ★</div>
-            </div>
-            """, unsafe_allow_html=True)
+            fam_receipt_html = f"""<div class="receipt"><div class="receipt-header"><div class="label">Family Total Spend · Last 90 Days</div><div class="amount">₹{g_total_spend:,.2f}</div></div>{rows_fam_html}<div class="receipt-header" style="margin-top:20px;"><div class="label">Member Contribution</div></div>{member_breakdown_html}<div class="receipt-footer">★ Connected Family Ledger ★</div></div>"""
+            st.markdown(fam_receipt_html, unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
