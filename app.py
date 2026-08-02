@@ -467,6 +467,56 @@ with st.sidebar:
     use_sample = st.button("Use sample data")
     st.markdown("---")
     forecast_days = st.slider("Forecast horizon (days)", 7, 60, 30)
+    
+    st.markdown("---")
+    st.markdown('<div class="panel-title">Daily Expense Entry</div>', unsafe_allow_html=True)
+    with st.form("daily_entry_form", clear_on_submit=True):
+        entry_date = st.date_input("Date", value=datetime.today().date())
+        entry_desc = st.text_input("Description", placeholder="e.g. Starbucks Coffee")
+        entry_amount = st.number_input("Amount (₹)", min_value=0.0, step=10.0)
+        entry_category = st.selectbox("Category", ["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"])
+        submit_entry = st.form_submit_button("Submit Entry")
+        
+    if submit_entry:
+        if not entry_desc.strip():
+            st.sidebar.error("Please enter a transaction description.")
+        elif entry_amount <= 0:
+            st.sidebar.error("Amount must be greater than ₹0.")
+        elif st.session_state.data is None:
+            st.sidebar.error("No ledger loaded. Please load sample data or upload a CSV first.")
+        else:
+            # Check for gap
+            df_check = st.session_state.data
+            last_date = pd.to_datetime(df_check["date"]).max().date()
+            if entry_date > last_date + timedelta(days=1):
+                # Trigger gap resolution state
+                st.session_state.resolving_gap = True
+                st.session_state.pending_entry = {
+                    "date": entry_date,
+                    "description": entry_desc,
+                    "amount": entry_amount,
+                    "category": entry_category
+                }
+                missing_dates = []
+                curr = last_date + timedelta(days=1)
+                while curr < entry_date:
+                    missing_dates.append(curr)
+                    curr += timedelta(days=1)
+                st.session_state.missing_dates = missing_dates
+                st.rerun()
+            else:
+                # No gap, just append the entry
+                new_row = pd.DataFrame([{
+                    "date": entry_date,
+                    "description": entry_desc,
+                    "amount": entry_amount,
+                    "category": entry_category,
+                    "anomaly": 1
+                }])
+                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+                st.session_state.data = detect_anomalies(st.session_state.data)
+                st.sidebar.success("Entry saved successfully!")
+                st.rerun()
 
 if "data" not in st.session_state:
     st.session_state.data = None
@@ -524,6 +574,40 @@ anomalies = df[df["anomaly"] == -1]
 # ----------------------------------------------------------------------
 st.markdown('<div class="app-title">Smart Expense Tracker</div>', unsafe_allow_html=True)
 st.markdown('<div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection</div>', unsafe_allow_html=True)
+
+# ----------------------------------------------------------------------
+# GAP RESOLUTION UI
+# ----------------------------------------------------------------------
+if st.session_state.get("resolving_gap", False):
+    st.markdown(f"""
+    <div class="panel" style="border: 1px solid var(--gold); background: rgba(212,175,55,0.05); margin-bottom: 2rem;">
+        <div class="panel-title" style="color: var(--gold);">Gap Resolution Required</div>
+        <span class="mono" style="color: var(--paper-cream); font-size: 0.9rem;">
+            You have missed logging transactions between <b>{pd.to_datetime(df["date"]).max().date()}</b> and your entry date <b>{st.session_state.pending_entry["date"]}</b>.
+            Please specify the spending details for each missing day to maintain complete history.
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("gap_resolution_form"):
+        resolutions = {}
+        for d in st.session_state.missing_dates:
+            st.markdown(f"<span class='mono' style='font-size:0.95rem; font-weight:600;'>Date: {d.strftime('%A, %b %d, %Y')}</span>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 1.5, 1.5])
+            with col1:
+                st.checkbox("No Spend (₹0)", key=f"zero_{d}", value=True)
+            with col2:
+                st.number_input("Amount (₹)", min_value=0.0, step=50.0, key=f"amt_{d}", disabled=True)
+            with col3:
+                st.selectbox("Category", options=["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"], index=6, key=f"cat_{d}", disabled=True)
+            st.markdown("<hr style='border-top:1px dotted rgba(242,236,221,0.1); margin: 0.5rem 0;'>", unsafe_allow_html=True)
+            
+        if st.form_submit_button("Save and Resolve Gaps"):
+            # Placeholder resolution for step 1
+            st.session_state.resolving_gap = False
+            st.rerun()
+    st.stop()
+
 
 if csv_error is not None:
     st.markdown(f"""
