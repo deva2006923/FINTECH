@@ -19,6 +19,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.ensemble import IsolationForest
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_recall_fscore_support
 
 # ----------------------------------------------------------------------
 # PAGE CONFIG
@@ -318,15 +320,54 @@ def generate_sample_data(n=180, seed=42):
 # ----------------------------------------------------------------------
 @st.cache_resource
 def train_categorizer(df):
-    texts = df["description"].str.lower()
     labels = df["true_category"] if "true_category" in df.columns else None
     if labels is None:
-        return None, None
+        return None, None, None
+        
+    df_clean = df.dropna(subset=["description", "true_category"])
+    if len(df_clean) < 10:
+        return None, None, None
+        
+    # We do a train/test split to evaluate our categorizer
+    X_train_text, X_test_text, y_train, y_test = train_test_split(
+        df_clean["description"].astype(str).str.lower(),
+        df_clean["true_category"],
+        test_size=0.2,
+        random_state=42,
+        stratify=df_clean["true_category"] if df_clean["true_category"].nunique() > 1 else None
+    )
+    
     vec = TfidfVectorizer()
-    X = vec.fit_transform(texts)
+    X_train = vec.fit_transform(X_train_text)
+    
     clf = MultinomialNB()
-    clf.fit(X, labels)
-    return vec, clf
+    clf.fit(X_train, y_train)
+    
+    # Evaluate
+    X_test = vec.transform(X_test_text)
+    y_pred = clf.predict(X_test)
+    
+    unique_labels = sorted(list(set(y_test) | set(y_pred)))
+    cm = confusion_matrix(y_test, y_pred, labels=unique_labels)
+    
+    acc = accuracy_score(y_test, y_pred)
+    prec, rec, f1, _ = precision_recall_fscore_support(y_test, y_pred, average="weighted", zero_division=0)
+    
+    metrics = {
+        "accuracy": acc,
+        "precision": prec,
+        "recall": rec,
+        "f1": f1,
+        "labels": unique_labels,
+        "confusion_matrix": cm.tolist()
+    }
+    
+    # Retrain on full dataset to maximize classification power for the actual table categorization
+    X_full = vec.fit_transform(df_clean["description"].astype(str).str.lower())
+    clf_full = MultinomialNB()
+    clf_full.fit(X_full, df_clean["true_category"])
+    
+    return vec, clf_full, metrics
 
 def categorize(df, vec, clf):
     if vec is None:
@@ -469,7 +510,7 @@ else:
 # ----------------------------------------------------------------------
 # ML PIPELINE
 # ----------------------------------------------------------------------
-vec, clf = train_categorizer(df)
+vec, clf, metrics = train_categorizer(df)
 df = categorize(df, vec, clf)
 df = detect_anomalies(df)
 daily, forecast_df = forecast_next_period(df, days_ahead=forecast_days)
@@ -573,6 +614,54 @@ with col_right:
                     f'<span class="stamp">₹{row["amount"]:,.0f}</span></div>',
                     unsafe_allow_html=True,
                 )
+
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">Model Performance Metrics</div>', unsafe_allow_html=True)
+        if metrics is None:
+            st.markdown('<span class="mono" style="opacity:0.65;">No evaluation metrics available (ground-truth labels missing).</span>', unsafe_allow_html=True)
+        else:
+            st.markdown(
+                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);">'
+                f'<span class="mono" style="color:var(--gold);">Accuracy</span>'
+                f'<span class="mono" style="font-weight:700;">{metrics["accuracy"]*100:.1f}%</span></div>'
+                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);">'
+                f'<span class="mono" style="color:var(--gold);">Weighted F1-Score</span>'
+                f'<span class="mono" style="font-weight:700;">{metrics["f1"]:.3f}</span></div>'
+                f'<div class="receipt-row" style="border-bottom:1px dotted rgba(242,236,221,0.15);">'
+                f'<span class="mono" style="color:var(--gold);">Weighted Precision</span>'
+                f'<span class="mono" style="font-weight:700;">{metrics["precision"]:.3f}</span></div>',
+                unsafe_allow_html=True
+            )
+            
+            st.markdown('<div class="mono" style="font-size:0.75rem; color:var(--gold); margin-top:1.2rem; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">Confusion Matrix (True \\ Pred)</div>', unsafe_allow_html=True)
+            
+            labels = metrics["labels"]
+            cm = metrics["confusion_matrix"]
+            
+            header_cols = "".join(f'<th style="text-align:center; padding:0.25rem; font-weight:600; border-bottom:1px solid rgba(242,236,221,0.25);">{lbl[:4]}</th>' for lbl in labels)
+            thead = f'<thead><tr><th style="text-align:left; padding:0.25rem; font-weight:600; border-bottom:1px solid rgba(242,236,221,0.25);">True \\ Pred</th>{header_cols}</tr></thead>'
+            
+            rows_html = ""
+            for i, true_label in enumerate(labels):
+                cells = "".join(
+                    f'<td style="text-align:center; padding:0.25rem; border-bottom:1px dotted rgba(242,236,221,0.1); '
+                    f'background: {"rgba(124,152,133,0.15)" if i == j and cm[i][j] > 0 else "none"};'
+                    f'color: {"var(--sage)" if i == j and cm[i][j] > 0 else "var(--paper-cream)"}; font-weight: {"700" if i == j else "400"};">'
+                    f'{cm[i][j]}</td>'
+                    for j in range(len(labels))
+                )
+                rows_html += f'<tr><td style="text-align:left; padding:0.25rem; border-bottom:1px dotted rgba(242,236,221,0.1); font-weight:600; text-transform:uppercase; font-size:0.75rem;">{true_label}</td>{cells}</tr>'
+            
+            cm_table = f"""
+            <table class="mono" style="width:100%; border-collapse:collapse; color:var(--paper-cream); font-size:0.8rem; margin-top:0.3rem;">
+                {thead}
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+            """
+            st.markdown(cm_table, unsafe_allow_html=True)
 
 # ---------------- FULL TABLE ----------------
 st.markdown('<div class="panel-title" style="margin-top:1.5rem;">All Transactions</div>', unsafe_allow_html=True)
