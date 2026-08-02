@@ -126,29 +126,13 @@ def generate_heatmap_html(df):
                     if len(txns) > 5:
                         txn_rows_html += f'<div class="mini-receipt-row" style="opacity:0.6;"><span>... +{len(txns)-5} more</span></div>'
                         
-                    tooltip_html = f"""
-                    <span class="tooltip">
-                        <div class="mini-receipt-title">{date_obj.strftime('%b %d, %Y')}</div>
-                        {txn_rows_html if txns else '<div class="mini-receipt-row" style="opacity:0.6;">No activity</div>'}
-                        <div class="mini-receipt-total"><span>Total Spend</span><span>₹{amt:,.2f}</span></div>
-                    </span>
-                    """
+                    tooltip_html = f'<span class="tooltip"><div class="mini-receipt-title">{date_obj.strftime("%b %d, %Y")}</div>{txn_rows_html if txns else "<div class=\'mini-receipt-row\' style=\'opacity:0.6;\'>No activity</div>"}<div class="mini-receipt-total"><span>Total Spend</span><span>₹{amt:,.2f}</span></div></span>'
                     row_cells += f'<td class="heatmap-cell" style="width:16px; height:16px; background:{bg_color}; border-radius:2px; position:relative;">{tooltip_html}</td>'
                 else:
                     row_cells += f'<td style="width:16px; height:16px; background:transparent;"></td>'
             rows_html += f'<tr>{row_cells}</tr>'
             
         month_spend = sum(daily_spend.get(d, 0.0) for d in months_dict[(year, month)])
-        months_html += f"""
-        <div style="display:inline-block; margin:0 12px 16px 0; vertical-align:top; background:rgba(27,42,38,0.4); padding:12px; border-radius:8px; border:1px solid rgba(242,236,221,0.1);">
-            <div style="font-family:'Space Grotesk', sans-serif; font-size:13px; font-weight:700; color:var(--gold); margin-bottom:8px; display:flex; justify-content:space-between;">
-                <span>📅 {month_name}</span>
-                <span style="color:var(--paper-cream); font-size:12px; margin-left:12px;">₹{month_spend:,.2f}</span>
-            </div>
-            <table style="border-collapse:separate; border-spacing:3px;">
-                <tbody>{rows_html}</tbody>
-            </table>
-        </div>
-        """
+        months_html += f'<div style="display:inline-block; margin:0 12px 16px 0; vertical-align:top; background:rgba(27,42,38,0.4); padding:12px; border-radius:8px; border:1px solid rgba(242,236,221,0.1);"><div style="font-family:\'Space Grotesk\', sans-serif; font-size:13px; font-weight:700; color:var(--gold); margin-bottom:8px; display:flex; justify-content:space-between;"><span>📅 {month_name}</span><span style="color:var(--paper-cream); font-size:12px; margin-left:12px;">₹{month_spend:,.2f}</span></div><table style="border-collapse:separate; border-spacing:3px;"><tbody>{rows_html}</tbody></table></div>'
         
     return f'<div class="heatmap-scroll-container" style="white-space:nowrap; overflow-x:auto; padding:4px 0;">{months_html}</div>'
