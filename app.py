@@ -307,43 +307,17 @@ def show_login_page():
                     st.error("Could not verify Google token. Please try again.")
 
         else:
-            # Fallback Google Sign-In button if .env keys not loaded yet
-            if "show_mock_dialog" not in st.session_state:
-                st.session_state.show_mock_dialog = False
-
-            if st.session_state.show_mock_dialog:
-                with st.container(border=True):
-                    st.markdown("<b style='color:var(--gold); font-size:14px;'>Simulating Google Account Selection</b>", unsafe_allow_html=True)
-                    st.markdown("<div style='font-size:12px; color:var(--sage); margin-top:4px; margin-bottom:12px;'>Enter any Gmail address to simulate logging in with different accounts.</div>", unsafe_allow_html=True)
-                    
-                    with st.form("mock_google_form", clear_on_submit=False):
-                        gmail_in = st.text_input("Gmail Address", placeholder="name@gmail.com", key="gmail_input_fallback").strip().lower()
-                        c_sub1, c_sub2 = st.columns(2)
-                        with c_sub1:
-                            submit_btn = st.form_submit_button("Sign In", use_container_width=True)
-                        with c_sub2:
-                            cancel_btn = st.form_submit_button("Cancel", use_container_width=True)
-                
-                if submit_btn:
-                    if not gmail_in:
-                        st.error("Please enter a valid email.")
-                    else:
-                        user_part = gmail_in.split("@")[0]
-                        google_user = _auth.login(user_part, "")
-                        if google_user:
-                            st.session_state.logged_in    = True
-                            st.session_state.auth_profile = google_user
-                            st.session_state.data         = None
-                            st.session_state.view_group   = False
-                            st.session_state.show_mock_dialog = False
-                            st.rerun()
-                if cancel_btn:
-                    st.session_state.show_mock_dialog = False
-                    st.rerun()
-            else:
-                if st.button("Continue with Google", key="google_fallback_btn", use_container_width=True):
-                    st.session_state.show_mock_dialog = True
-                    st.rerun()
+            # Fallback warning if .env keys not loaded yet
+            st.markdown("""
+            <div style="background:rgba(193,80,46,0.1); border:1px solid rgba(193,80,46,0.3); 
+                        padding:16px; border-radius:8px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.6;">
+                <span style="font-size:20px;">🔒</span><br>
+                <b style="color:var(--stamp-red);">Secure Google Authentication is required.</b><br><br>
+                Please configure the following environment secrets in your Streamlit Cloud Settings or local <code>.env</code> file:<br><br>
+                <code style="color:var(--gold);">GOOGLE_CLIENT_ID</code><br>
+                <code style="color:var(--gold);">GOOGLE_CLIENT_SECRET</code>
+            </div>
+            """, unsafe_allow_html=True)
 
         # ── Footer note ───────────────────────────────────────────────
         st.markdown("""
