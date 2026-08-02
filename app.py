@@ -775,7 +775,7 @@ with tab_dash:
             </div>
             {rows_html}
             {member_html}
-            <div class="receipt-footer">*** Thank you for tracking responsibly ***</div>
+            <div class="receipt-footer">★ Thank you for tracking responsibly ★</div>
         </div>
         """, unsafe_allow_html=True)
 

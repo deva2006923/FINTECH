@@ -63,15 +63,49 @@ def train_categorizer(df):
     
     return vec, clf_full, metrics
 
+def rule_based_category(desc):
+    d = str(desc).lower().strip()
+    if any(w in d for w in ["electric", "bill", "water", "wifi", "internet", "recharge", "mobile", "rent", "utility"]):
+        return "Bills"
+    if any(w in d for w in ["food", "coffee", "starbucks", "dinner", "lunch", "swiggy", "zomato", "restaurant", "grocery", "cafe", "pizza", "burger"]):
+        return "Food"
+    if any(w in d for w in ["uber", "ola", "cab", "petrol", "fuel", "flight", "train", "bus", "metro", "travel", "irctc", "parking"]):
+        return "Travel"
+    if any(w in d for w in ["amazon", "flipkart", "clothes", "shopping", "mall", "store", "myntra", "shoes", "purchase"]):
+        return "Shopping"
+    if any(w in d for w in ["movie", "netflix", "spotify", "game", "cinema", "entertainment", "theatre", "event"]):
+        return "Entertainment"
+    if any(w in d for w in ["doctor", "hospital", "pharmacy", "medicine", "health", "gym", "clinic", "fitness"]):
+        return "Health"
+    return None
+
 def categorize(df, vec, clf):
     if df.empty:
         df["category"] = pd.Series(dtype=str)
         return df
-    if vec is None:
-        df["category"] = "Uncategorized"
-        return df
-    X = vec.transform(df["description"].str.lower())
-    df["category"] = clf.predict(X)
+        
+    categories = []
+    for _, row in df.iterrows():
+        existing_cat = str(row.get("category", "")).strip()
+        desc = str(row.get("description", ""))
+        
+        # 1. Rule-based keyword matching
+        rule_cat = rule_based_category(desc)
+        if rule_cat:
+            categories.append(rule_cat)
+        elif existing_cat and existing_cat not in ["Uncategorized", "nan", "None", ""]:
+            categories.append(existing_cat)
+        elif vec is not None and clf is not None:
+            try:
+                X = vec.transform([desc.lower()])
+                pred = clf.predict(X)[0]
+                categories.append(pred)
+            except Exception:
+                categories.append("Other")
+        else:
+            categories.append("Other")
+            
+    df["category"] = categories
     return df
 
 # ----------------------------------------------------------------------
