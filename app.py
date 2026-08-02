@@ -88,14 +88,32 @@ def generate_sample_data(n=180, seed=42):
 # RUNTIME ARCHITECTURE
 # Helper modules: ml_pipeline, assistant, and helpers hold all underlying algorithms.
 # ----------------------------------------------------------------------
+# # ----------------------------------------------------------------------
 # SIDEBAR
 # ----------------------------------------------------------------------
+LEDGER_FILE = "ledger_data.csv"
+
+def save_ledger_data(df):
+    df.to_csv(LEDGER_FILE, index=False)
+
+def load_ledger_data():
+    if os.path.exists(LEDGER_FILE):
+        try:
+            df = pd.read_csv(LEDGER_FILE)
+            df["date"] = pd.to_datetime(df["date"]).dt.date
+            return df
+        except Exception:
+            pass
+    df = generate_sample_data()
+    save_ledger_data(df)
+    return df
+
+if "data" not in st.session_state or st.session_state.data is None:
+    st.session_state.data = load_ledger_data()
+
 with st.sidebar:
     st.markdown("### 🧾 Ledger")
-    st.markdown("Upload transactions or use sample data.")
-    uploaded = st.file_uploader("CSV (date, description, amount)", type=["csv"])
-    use_sample = st.button("Use sample data")
-    st.markdown("---")
+    st.markdown("Manage accounts and enter transactions.")
     forecast_days = st.slider("Forecast horizon (days)", 7, 60, 30)
     st.markdown("---")
     api_key = st.text_input("Gemini API Key", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
@@ -113,12 +131,10 @@ with st.sidebar:
             st.sidebar.error("Please enter a transaction description.")
         elif entry_amount <= 0:
             st.sidebar.error("Amount must be greater than ₹0.")
-        elif st.session_state.data is None:
-            st.sidebar.error("No ledger loaded. Please load sample data or upload a CSV first.")
         else:
             # Check for gap
             df_check = st.session_state.data
-            last_date = pd.to_datetime(df_check["date"]).max().date()
+            last_date = pd.to_datetime(df_check["date"]).max().date() if not df_check.empty else datetime.today().date()
             if entry_date > last_date + timedelta(days=1):
                 # Trigger gap resolution state
                 st.session_state.resolving_gap = True
@@ -146,47 +162,12 @@ with st.sidebar:
                 }])
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
                 st.session_state.data = detect_anomalies(st.session_state.data)
+                save_ledger_data(st.session_state.data)
                 st.sidebar.success("Entry saved successfully!")
                 st.rerun()
 
-if "data" not in st.session_state:
-    st.session_state.data = None
-
-# Process uploaded file with change tracking
-if uploaded is not None:
-    file_key = f"{uploaded.name}_{uploaded.size}"
-    if st.session_state.get("last_uploaded_key") != file_key:
-        st.session_state.last_uploaded_key = file_key
-        st.session_state.force_sample = False
-        is_valid, validated_df, error_msg = validate_csv(uploaded)
-        if is_valid:
-            st.session_state.data = validated_df
-            st.session_state.csv_error = None
-        else:
-            st.session_state.csv_error = error_msg
-            st.session_state.data = None
-
-if use_sample:
-    st.session_state.data = generate_sample_data()
-    st.session_state.csv_error = None
-    st.session_state.force_sample = True
-
-# Fallback check
-if st.session_state.get("force_sample", False):
-    if st.session_state.data is None:
-        st.session_state.data = generate_sample_data()
-else:
-    if uploaded is None and st.session_state.data is None:
-        st.session_state.data = generate_sample_data()
-
-csv_error = st.session_state.get("csv_error", None)
-
-# If validation failed and we have no data, set placeholder df so execution doesn't crash before header renders
-if st.session_state.data is not None:
-    df = st.session_state.data.copy()
-else:
-    # Minimal dummy dataframe to allow initial downstream code to read, but it will stop rendering at header anyway
-    df = pd.DataFrame(columns=["date", "description", "amount", "category", "anomaly"])
+df = st.session_state.data.copy()
+csv_error = None
 
 # ----------------------------------------------------------------------
 # ML PIPELINE
@@ -273,6 +254,7 @@ if st.session_state.get("resolving_gap", False):
             res_df = pd.DataFrame(new_rows)
             st.session_state.data = pd.concat([st.session_state.data, res_df], ignore_index=True)
             st.session_state.data = detect_anomalies(st.session_state.data)
+            save_ledger_data(st.session_state.data)
             
             # Clear states
             st.session_state.resolving_gap = False
@@ -280,16 +262,6 @@ if st.session_state.get("resolving_gap", False):
             st.session_state.missing_dates = None
             st.success("All entries backfilled and saved!")
             st.rerun()
-    st.stop()
-
-
-if csv_error is not None:
-    st.markdown(f"""
-    <div class="panel" style="border: 1px solid var(--stamp-red); background: rgba(193,80,46,0.05); margin-bottom: 16px;">
-        <div class="panel-title" style="color: var(--stamp-red);">Ledger Validation Error</div>
-        <span class="mono" style="color: var(--paper-cream); font-size: 15px;">{csv_error}</span>
-    </div>
-    """, unsafe_allow_html=True)
     st.stop()
 
 # ---------------- COLUMNS LAYOUT (40/60 Split) ----------------
