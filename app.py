@@ -269,7 +269,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     position: relative;
     cursor: pointer;
 }
-/* Tooltip styling matching physical receipt */
+/* Micro-interaction: styling for tooltip popups matching the physical receipt look */
 .heatmap-cell .tooltip {
     visibility: hidden;
     width: 190px;
