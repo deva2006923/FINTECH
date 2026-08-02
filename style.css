@@ -357,3 +357,61 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     margin-left: 16px !important;
     vertical-align: middle !important;
 }
+
+/* ====================================================
+   ACCOUNT INFO BAR — full-width strip below header
+   ==================================================== */
+.account-bar {
+    display: flex !important;
+    align-items: stretch !important;
+    background: rgba(242,236,221,0.04) !important;
+    border: 1px solid rgba(242,236,221,0.14) !important;
+    border-radius: 8px !important;
+    padding: 24px 32px !important;     /* 8px multiples */
+    margin-bottom: 32px !important;    /* 8px multiple — matches header-block gap */
+    gap: 0 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+}
+.acct-stat {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    padding: 0 24px !important;        /* 8px multiple */
+}
+.acct-stat:first-child {
+    padding-left: 0 !important;
+}
+.acct-stat:last-child {
+    padding-right: 0 !important;
+}
+.acct-divider {
+    width: 1px !important;
+    background: rgba(242,236,221,0.12) !important;
+    flex-shrink: 0 !important;
+    align-self: stretch !important;
+}
+.acct-stat-label {
+    font-size: 11px !important;        /* slightly below 12px for subordinate labels */
+    font-weight: 600 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: var(--sage) !important;
+    opacity: 0.75 !important;
+}
+.acct-stat-uid {
+    font-size: 28px !important;        /* Multiple of 8, visually dominant */
+    font-weight: 700 !important;
+    letter-spacing: 0.20em !important;
+    color: var(--gold) !important;
+    line-height: 1.1 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+}
+.acct-stat-value {
+    font-size: 22px !important;        /* Slightly smaller than UID — clear hierarchy */
+    font-weight: 700 !important;
+    letter-spacing: 0.14em !important;
+    color: var(--paper-cream) !important;
+    line-height: 1.1 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+}

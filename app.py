@@ -356,16 +356,53 @@ by_category = df.groupby("category")["amount"].sum().sort_values(ascending=False
 anomalies = df[df["anomaly"] == -1]
 
 # ----------------------------------------------------------------------
-# HEADER
+# HEADER + ACCOUNT INFO BAR
 # ----------------------------------------------------------------------
+current_group = profile.get("group_code")
 group_badge = ""
-if st.session_state.view_group and profile.get("group_code"):
-    group_badge = f'<span class="group-view-badge">👨\u200d👩\u200d👧 Group View · {profile["group_code"]}</span>'
+if st.session_state.view_group and current_group:
+    group_badge = f'<span class="group-view-badge">👨\u200d👩\u200d👧 Group View · {current_group}</span>'
 
 st.markdown(f"""
 <div class="header-block">
     <div class="app-title">Smart Expense Tracker {group_badge}</div>
-    <div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection · User ID: <b>{my_uid}</b></div>
+    <div class="app-subtitle">AI-Powered Spending Insights &amp; Anomaly Detection</div>
+</div>
+""", unsafe_allow_html=True)
+
+# -- Prominent Account Info Bar --
+group_code_display = current_group if current_group else "—"
+group_members_count = 0
+if current_group:
+    _gi = load_group_index()
+    group_members_count = len(_gi.get(current_group, [my_uid]))
+
+group_status_html = (
+    f'<div class="acct-stat-value">{current_group}</div>'
+    f'<div class="acct-stat-label">{group_members_count} member(s) linked · Toggle in sidebar</div>'
+    if current_group else
+    '<div class="acct-stat-value" style="opacity:0.4;">NOT IN A GROUP</div>'
+    '<div class="acct-stat-label">Create or join one in the sidebar</div>'
+)
+
+st.markdown(f"""
+<div class="account-bar">
+    <div class="acct-stat">
+        <div class="acct-stat-label">YOUR LEDGER ID</div>
+        <div class="acct-stat-uid">{my_uid}</div>
+        <div class="acct-stat-label">Share with family to link accounts</div>
+    </div>
+    <div class="acct-divider"></div>
+    <div class="acct-stat">
+        <div class="acct-stat-label">DISPLAY NAME</div>
+        <div class="acct-stat-value">{profile.get("display_name", "Me")}</div>
+        <div class="acct-stat-label">Edit in sidebar</div>
+    </div>
+    <div class="acct-divider"></div>
+    <div class="acct-stat">
+        <div class="acct-stat-label">FAMILY GROUP CODE</div>
+        {group_status_html}
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
