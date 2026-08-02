@@ -420,10 +420,34 @@ with st.sidebar:
 
 
     # ── Family Group Section ────────────────────────────────────────
-    st.markdown('<div class="panel-title">👨‍👩‍👧 Family Group</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">👨‍👩‍👧 Family Groups</div>', unsafe_allow_html=True)
 
-    current_group_id = profile.get("group_id")
-    group_data       = _auth.get_group(current_group_id) if current_group_id else None
+    user_groups = profile.get("groups", [])
+    
+    if "active_group_id" not in st.session_state:
+        st.session_state.active_group_id = user_groups[0] if user_groups else None
+
+    # If the user left their active group or it was deleted, reset
+    if st.session_state.active_group_id not in user_groups:
+        st.session_state.active_group_id = user_groups[0] if user_groups else None
+
+    current_group_id = st.session_state.active_group_id
+    
+    if user_groups:
+        # Multi-group selector
+        if len(user_groups) > 1:
+            group_options = {g: _auth.get_group(g).get("host_name", g) + "'s Group" for g in user_groups if _auth.get_group(g)}
+            selected_group = st.selectbox(
+                "Active Group", 
+                options=list(group_options.keys()), 
+                format_func=lambda x: group_options.get(x, x),
+                index=user_groups.index(current_group_id) if current_group_id in user_groups else 0
+            )
+            if selected_group != current_group_id:
+                st.session_state.active_group_id = selected_group
+                st.rerun()
+                
+    group_data = _auth.get_group(current_group_id) if current_group_id else None
 
     if current_group_id and group_data:
         is_host = group_data["host_uid"] == my_uid
@@ -470,9 +494,9 @@ with st.sidebar:
                     "Enter 8-char Ledger ID",
                     max_chars=8,
                     placeholder="e.g. A1B2C3D4",
-                    key="invite_uid_input"
+                    key=f"invite_uid_input_{current_group_id}"
                 ).strip().upper()
-                if st.button("Send Invite", key="send_invite_btn"):
+                if st.button("Send Invite", key=f"send_invite_btn_{current_group_id}"):
                     res = _auth.invite_member(current_group_id, invite_uid)
                     if res == "ok":
                         st.success(f"✅ Invite sent to {invite_uid}!")
@@ -485,23 +509,25 @@ with st.sidebar:
 
         # Leave / Disband
         leave_label = "Disband Group" if is_host and len(members) <= 1 else "Leave Group"
-        if st.button(leave_label, key="leave_group_btn"):
+        if st.button(leave_label, key=f"leave_group_btn_{current_group_id}"):
             _auth.leave_group(current_group_id, my_uid)
             _u = _auth.get_user_by_uid(my_uid)
             if _u:
                 st.session_state.auth_profile = _u
             st.session_state.view_group = False
+            st.session_state.active_group_id = None
             st.rerun()
 
-    else:
-        # Not in any group
-        if st.button("🏠  Host a Family Group", key="create_group_btn", use_container_width=True):
-            _auth.create_group(my_uid, profile.get("display_name", my_uid))
-            _u = _auth.get_user_by_uid(my_uid)
-            if _u:
-                st.session_state.auth_profile = _u
-            st.rerun()
+    # Allow hosting a NEW group even if already in one
+    if st.button("🏠  Host a New Family Group", key="create_group_btn", use_container_width=True):
+        new_gid = _auth.create_group(my_uid, profile.get("display_name", my_uid))
+        _u = _auth.get_user_by_uid(my_uid)
+        if _u:
+            st.session_state.auth_profile = _u
+        st.session_state.active_group_id = new_gid
+        st.rerun()
 
+    if not user_groups:
         st.markdown(
             '<span class="mono" style="font-size:12px; opacity:0.6;">'
             'Or accept a family invite from the dashboard.</span>',
@@ -571,7 +597,7 @@ with st.sidebar:
 # ======================================================================
 # DATA — load personal or group ledger
 # ======================================================================
-current_group_id = profile.get("group_id")
+current_group_id = st.session_state.get("active_group_id")
 if st.session_state.view_group and current_group_id:
     df = load_group_ledger(current_group_id, my_uid)
 else:
@@ -744,6 +770,21 @@ with col_left:
             f'<span class="amt">₹{amt:,.2f}</span>'
             f'</div>'
         )
+        
+    member_html = ""
+    if st.session_state.view_group and current_group_id:
+        member_html += '<div class="receipt-header" style="margin-top:20px;"><div class="label">Member Breakdown</div></div>'
+        by_member = df.groupby("user_id")["amount"].sum().sort_values(ascending=False)
+        for uid, amt in by_member.items():
+            u_prof = _auth.get_user_by_uid(uid)
+            u_name = u_prof["display_name"] if u_prof else uid
+            member_html += (
+                f'<div class="receipt-row" style="opacity:0.8;">'
+                f'<span class="cat">👤 {u_name}</span>'
+                f'<span class="amt">₹{amt:,.2f}</span>'
+                f'</div>'
+            )
+
     st.markdown(f"""
     <div class="receipt">
         <div class="receipt-header">
@@ -751,6 +792,7 @@ with col_left:
             <div class="amount">₹{total_spend:,.2f}</div>
         </div>
         {rows_html}
+        {member_html}
         <div class="receipt-footer">*** Thank you for tracking responsibly ***</div>
     </div>
     """, unsafe_allow_html=True)
@@ -801,28 +843,49 @@ with col_right:
             '</div>',
             unsafe_allow_html=True,
         )
-        st.markdown("""
-        <div class="ai-chips">
-            <span class="ai-chip">How much on Food this month?</span>
-            <span class="ai-chip">Show my top 3 expenses</span>
-            <span class="ai-chip">Any unusual spending?</span>
-            <span class="ai-chip">Compare categories</span>
-        </div>
-        """, unsafe_allow_html=True)
 
-        query_input = st.text_input(
-            "",
-            placeholder="💬 Type your question here…",
-            label_visibility="collapsed",
-            key="ai_query_input"
-        )
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+        
+        # Display history
+        if st.session_state.chat_history:
+            for msg in st.session_state.chat_history:
+                if msg["role"] == "user":
+                    st.markdown(f"<div style='margin-top:10px; font-family:\"IBM Plex Mono\", monospace; font-size:13px; color:var(--ink-black); background:rgba(212,175,55,0.1); padding:8px 12px; border-radius:8px; border:1px solid rgba(212,175,55,0.3);'><b>You:</b> {msg['content']}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div class='stapled-note' style='margin-top:10px;'>{msg['content']}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="ai-chips">
+                <span class="ai-chip">How much on Food this month?</span>
+                <span class="ai-chip">Show my top 3 expenses</span>
+                <span class="ai-chip">Any unusual spending?</span>
+                <span class="ai-chip">Compare categories</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        query_input = st.chat_input("💬 Ask the Ledger AI...")
         if query_input:
-            parsed = parse_natural_language_query(query_input, df)
-            if parsed["type"] != "open_ended":
-                response_html = execute_assistant_query(parsed, df)
-            else:
-                response_html = run_open_ended_analysis(query_input, df, api_key=api_key)
-            st.markdown(f'<div class="stapled-note">{response_html}</div>', unsafe_allow_html=True)
+            st.session_state.chat_history.append({"role": "user", "content": query_input})
+            st.rerun()
+
+        # Check if we need to generate a response
+        if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+            user_msg = st.session_state.chat_history[-1]["content"]
+            with st.spinner("Analyzing ledger..."):
+                parsed = parse_natural_language_query(user_msg, df, history=st.session_state.chat_history)
+                if parsed["type"] != "open_ended":
+                    response_html = execute_assistant_query(parsed, df)
+                else:
+                    response_html = run_open_ended_analysis(user_msg, df, api_key=api_key)
+                
+                # Append both the content and the parsed metadata for context
+                st.session_state.chat_history.append({
+                    "role": "assistant", 
+                    "content": response_html,
+                    "meta": parsed
+                })
+            st.rerun()
 
     # [4] Anomaly Flags + Performance Metrics
     with st.container(border=True):

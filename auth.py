@@ -69,7 +69,7 @@ def register(username, password, display_name):
         "user_id":       uid,
         "password_hash": _hash(password),
         "display_name":  display_name.strip() or username.strip(),
-        "group_id":      None,
+        "groups":        [],
     }
     users[key] = profile
     _save_users(users)
@@ -111,13 +111,29 @@ def update_display_name(uid, display_name):
     return False
 
 
-def update_group_id(uid, group_id):
-    """Link (or unlink) a user to a group_id in users.json."""
+def add_to_group(uid, group_id):
+    """Add a group_id to a user's groups list in users.json."""
     users = _load_users()
     for key, profile in users.items():
         if profile.get("user_id") == uid:
-            users[key]["group_id"] = group_id
-            _save_users(users)
+            groups_list = users[key].get("groups", [])
+            if group_id not in groups_list:
+                groups_list.append(group_id)
+                users[key]["groups"] = groups_list
+                _save_users(users)
+            return True
+    return False
+
+def remove_from_group(uid, group_id):
+    """Remove a group_id from a user's groups list in users.json."""
+    users = _load_users()
+    for key, profile in users.items():
+        if profile.get("user_id") == uid:
+            groups_list = users[key].get("groups", [])
+            if group_id in groups_list:
+                groups_list.remove(group_id)
+                users[key]["groups"] = groups_list
+                _save_users(users)
             return True
     return False
 
@@ -138,7 +154,7 @@ def create_group(host_uid, host_name):
         "pending_invites": [],
     }
     _save_groups(groups)
-    update_group_id(host_uid, group_id)
+    add_to_group(host_uid, group_id)
     return group_id
 
 
@@ -202,7 +218,7 @@ def accept_invite(group_id, uid):
         group["members"].append(uid)
     groups[group_id] = group
     _save_groups(groups)
-    update_group_id(uid, group_id)
+    add_to_group(uid, group_id)
     return True
 
 
@@ -242,12 +258,12 @@ def leave_group(group_id, uid):
         else:
             del groups[group_id]
             _save_groups(groups)
-            update_group_id(uid, None)
+            remove_from_group(uid, group_id)
             return True
 
     groups[group_id] = group
     _save_groups(groups)
-    update_group_id(uid, None)
+    remove_from_group(uid, group_id)
     return True
 
 
@@ -365,7 +381,7 @@ def register_or_login_google(google_id, email, display_name, picture=""):
         "email":         email,
         "google_id":     google_id,
         "picture":       picture,
-        "group_id":      None,
+        "groups":        [],
     }
     users[username_key] = new_profile
     _save_users(users)
