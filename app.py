@@ -137,6 +137,8 @@ def load_ledger_data(uid):
             df["date"] = pd.to_datetime(df["date"]).dt.date
             if "user_id" not in df.columns:
                 df["user_id"] = uid
+            vec, clf, _ = train_categorizer(df)
+            df = categorize(df, vec, clf)
             return df
         except Exception:
             pass
