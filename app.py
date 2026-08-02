@@ -213,6 +213,23 @@ section[data-testid="stSidebar"] * {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# Supplemental style block to fix Streamlit's st.container(border=True) rendering for panel styling
+PANEL_FIX_CSS = """
+<style>
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) {
+    background: rgba(242,236,221,0.05) !important;
+    border: 1px solid rgba(242,236,221,0.15) !important;
+    border-radius: 6px !important;
+    padding: 1.4rem 1.5rem !important;
+    margin-bottom: 1.2rem !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
+    padding: 0 !important;
+}
+</style>
+"""
+st.markdown(PANEL_FIX_CSS, unsafe_allow_html=True)
+
 # ----------------------------------------------------------------------
 # SAMPLE DATA GENERATOR (used if no CSV uploaded)
 # ----------------------------------------------------------------------
@@ -498,64 +515,64 @@ with col_left:
 
 # ---------------- RIGHT: PANELS ----------------
 with col_right:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="panel-title">Forecast — Next Period</div>', unsafe_allow_html=True)
-    chart_df = pd.concat([
-        daily.rename(columns={"amount": "Actual"})[["date", "Actual"]].set_index("date"),
-        forecast_df.rename(columns={"amount": "Forecast"})[["date", "Forecast"]].set_index("date"),
-    ], axis=0)
-    st.line_chart(chart_df, height=220)
-    st.markdown(
-        f'<span class="mono">Projected next {forecast_days} days: '
-        f'₹{forecast_df["amount"].sum():,.2f}</span>',
-        unsafe_allow_html=True,
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">Forecast — Next Period</div>', unsafe_allow_html=True)
+        chart_df = pd.concat([
+            daily.rename(columns={"amount": "Actual"})[["date", "Actual"]].set_index("date"),
+            forecast_df.rename(columns={"amount": "Forecast"})[["date", "Forecast"]].set_index("date"),
+        ], axis=0)
+        st.line_chart(chart_df, height=220)
+        st.markdown(
+            f'<span class="mono">Projected next {forecast_days} days: '
+            f'₹{forecast_df["amount"].sum():,.2f}</span>',
+            unsafe_allow_html=True,
+        )
 
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="panel-title">Anomaly Flags</div>', unsafe_allow_html=True)
-    if len(anomalies) == 0:
-        st.markdown('<span class="mono">No unusual transactions detected.</span>', unsafe_allow_html=True)
-    else:
-        # Calculate category averages from normal transactions
-        normal_df = df[df["anomaly"] == 1]
-        category_averages = normal_df.groupby("category")["amount"].mean().to_dict() if not normal_df.empty else {}
-        overall_category_averages = df.groupby("category")["amount"].mean().to_dict()
-        global_average = df["amount"].mean()
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">Anomaly Flags</div>', unsafe_allow_html=True)
+        if len(anomalies) == 0:
+            st.markdown('<span class="mono">No unusual transactions detected.</span>', unsafe_allow_html=True)
+        else:
+            # Calculate category averages from normal transactions
+            normal_df = df[df["anomaly"] == 1]
+            category_averages = normal_df.groupby("category")["amount"].mean().to_dict() if not normal_df.empty else {}
+            overall_category_averages = df.groupby("category")["amount"].mean().to_dict()
+            global_average = df["amount"].mean()
 
-        for _, row in anomalies.sort_values("amount", ascending=False).iterrows():
-            cat = row["category"]
-            amt = row["amount"]
-            cat_avg = category_averages.get(cat, overall_category_averages.get(cat, global_average))
+            for _, row in anomalies.sort_values("amount", ascending=False).iterrows():
+                cat = row["category"]
+                amt = row["amount"]
+                cat_avg = category_averages.get(cat, overall_category_averages.get(cat, global_average))
 
-            if cat_avg > 0:
-                ratio = amt / cat_avg
-            else:
-                ratio = 1.0
-
-            if cat in ["Other", "Uncategorized"]:
-                if ratio >= 1.5:
-                    explanation = f"{ratio:.1f}x higher than baseline standard (₹{cat_avg:,.2f})"
+                if cat_avg > 0:
+                    ratio = amt / cat_avg
                 else:
-                    explanation = "Unusual merchant or transaction descriptor pattern"
-            else:
-                if ratio >= 1.5:
-                    explanation = f"{ratio:.1f}x higher than {cat} average (₹{cat_avg:,.2f})"
-                elif ratio <= 0.25 and ratio > 0:
-                    explanation = f"{1.0/ratio:.1f}x lower than {cat} average (₹{cat_avg:,.2f})"
-                else:
-                    explanation = f"Unusual timing pattern (day of month) for {cat}"
+                    ratio = 1.0
 
-            st.markdown(
-                f'<div class="receipt-row" style="color:var(--paper-cream); border-bottom:1px dotted rgba(242,236,221,0.2); align-items: center; padding: 0.4rem 0;">'
-                f'<div style="display: flex; flex-direction: column;">'
-                f'<span class="mono" style="font-weight: 500;">{row["date"]} · {row["description"]}</span>'
-                f'<span class="mono" style="font-size: 0.75rem; color: var(--gold); opacity: 0.85; margin-top: 0.15rem;">→ {explanation}</span>'
-                f'</div>'
-                f'<span class="stamp">₹{row["amount"]:,.0f}</span></div>',
-                unsafe_allow_html=True,
-            )
-    st.markdown('</div>', unsafe_allow_html=True)
+                if cat in ["Other", "Uncategorized"]:
+                    if ratio >= 1.5:
+                        explanation = f"{ratio:.1f}x higher than baseline standard (₹{cat_avg:,.2f})"
+                    else:
+                        explanation = "Unusual merchant or transaction descriptor pattern"
+                else:
+                    if ratio >= 1.5:
+                        explanation = f"{ratio:.1f}x higher than {cat} average (₹{cat_avg:,.2f})"
+                    elif ratio <= 0.25 and ratio > 0:
+                        explanation = f"{1.0/ratio:.1f}x lower than {cat} average (₹{cat_avg:,.2f})"
+                    else:
+                        explanation = f"Unusual timing pattern (day of month) for {cat}"
+
+                st.markdown(
+                    f'<div class="receipt-row" style="color:var(--paper-cream); border-bottom:1px dotted rgba(242,236,221,0.2); align-items: center; padding: 0.4rem 0;">'
+                    f'<div style="display: flex; flex-direction: column;">'
+                    f'<span class="mono" style="font-weight: 500;">{row["date"]} · {row["description"]}</span>'
+                    f'<span class="mono" style="font-size: 0.75rem; color: var(--gold); opacity: 0.85; margin-top: 0.15rem;">→ {explanation}</span>'
+                    f'</div>'
+                    f'<span class="stamp">₹{row["amount"]:,.0f}</span></div>',
+                    unsafe_allow_html=True,
+                )
 
 # ---------------- FULL TABLE ----------------
 st.markdown('<div class="panel-title" style="margin-top:1.5rem;">All Transactions</div>', unsafe_allow_html=True)
