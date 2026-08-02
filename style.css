@@ -651,8 +651,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ai-panel-marker) {
     margin-top: 2px !important;
 }
 
-/* Hide Streamlit form and input instruction tags to avoid overlapping */
-.stFormInstruction, [data-testid="stFormInstruction"], [data-testid="InputInstruction"], div[class*="instructions"] {
+/* Hide Streamlit form instructions to avoid overlapping */
+.stFormInstruction, [data-testid="stFormInstruction"] {
     display: none !important;
     height: 0px !important;
     margin: 0px !important;
