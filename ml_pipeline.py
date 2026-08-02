@@ -64,6 +64,9 @@ def train_categorizer(df):
     return vec, clf_full, metrics
 
 def categorize(df, vec, clf):
+    if df.empty:
+        df["category"] = pd.Series(dtype=str)
+        return df
     if vec is None:
         df["category"] = "Uncategorized"
         return df
@@ -75,6 +78,9 @@ def categorize(df, vec, clf):
 # ML: ANOMALY DETECTION (Isolation Forest on amount + day-of-month)
 # ----------------------------------------------------------------------
 def detect_anomalies(df):
+    if df.empty:
+        df["anomaly"] = pd.Series(dtype=int)
+        return df
     feats = pd.DataFrame({
         "amount": df["amount"],
         "day": pd.to_datetime(df["date"]).dt.day,
@@ -87,7 +93,13 @@ def detect_anomalies(df):
 # ML: FORECAST (simple linear trend on daily totals)
 # ----------------------------------------------------------------------
 def forecast_next_period(df, days_ahead=30):
+    if df.empty:
+        return pd.DataFrame(columns=["date", "amount"]), pd.DataFrame(columns=["date", "amount"])
+        
     daily = df.groupby("date")["amount"].sum().reset_index()
+    if len(daily) < 2:
+        return daily, pd.DataFrame(columns=["date", "amount"])
+        
     daily["t"] = (pd.to_datetime(daily["date"]) - pd.to_datetime(daily["date"]).min()).dt.days
     X = daily[["t"]].values
     y = daily["amount"].values
