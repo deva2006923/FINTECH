@@ -312,17 +312,17 @@ def show_login_page():
                 st.session_state.show_mock_dialog = False
 
             if st.session_state.show_mock_dialog:
-                st.markdown("<div style='margin-bottom:12px; background:rgba(212,175,55,0.08); padding:16px; border-radius:8px; border:1px solid rgba(212,175,55,0.25); text-align:left;'>", unsafe_allow_html=True)
-                st.markdown("<b style='color:var(--gold); font-size:14px;'>Simulating Google Account Selection</b>", unsafe_allow_html=True)
-                st.markdown("<div style='font-size:12px; color:var(--sage); margin-top:4px; margin-bottom:12px;'>Enter any Gmail address to simulate logging in with different accounts.</div>", unsafe_allow_html=True)
-                
-                with st.form("mock_google_form", clear_on_submit=False):
-                    gmail_in = st.text_input("Gmail Address", placeholder="name@gmail.com", key="gmail_input_fallback").strip().lower()
-                    c_sub1, c_sub2 = st.columns(2)
-                    with c_sub1:
-                        submit_btn = st.form_submit_button("Sign In", use_container_width=True)
-                    with c_sub2:
-                        cancel_btn = st.form_submit_button("Cancel", use_container_width=True)
+                with st.container(border=True):
+                    st.markdown("<b style='color:var(--gold); font-size:14px;'>Simulating Google Account Selection</b>", unsafe_allow_html=True)
+                    st.markdown("<div style='font-size:12px; color:var(--sage); margin-top:4px; margin-bottom:12px;'>Enter any Gmail address to simulate logging in with different accounts.</div>", unsafe_allow_html=True)
+                    
+                    with st.form("mock_google_form", clear_on_submit=False):
+                        gmail_in = st.text_input("Gmail Address", placeholder="name@gmail.com", key="gmail_input_fallback").strip().lower()
+                        c_sub1, c_sub2 = st.columns(2)
+                        with c_sub1:
+                            submit_btn = st.form_submit_button("Sign In", use_container_width=True)
+                        with c_sub2:
+                            cancel_btn = st.form_submit_button("Cancel", use_container_width=True)
                 
                 if submit_btn:
                     if not gmail_in:
@@ -340,7 +340,6 @@ def show_login_page():
                 if cancel_btn:
                     st.session_state.show_mock_dialog = False
                     st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
             else:
                 if st.button("Continue with Google", key="google_fallback_btn", use_container_width=True):
                     st.session_state.show_mock_dialog = True
