@@ -590,21 +590,60 @@ if st.session_state.get("resolving_gap", False):
     """, unsafe_allow_html=True)
     
     with st.form("gap_resolution_form"):
-        resolutions = {}
         for d in st.session_state.missing_dates:
             st.markdown(f"<span class='mono' style='font-size:0.95rem; font-weight:600;'>Date: {d.strftime('%A, %b %d, %Y')}</span>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns([1, 1.5, 1.5])
+            col1, col2, col3 = st.columns([1.2, 1.5, 1.5])
             with col1:
                 st.checkbox("No Spend (₹0)", key=f"zero_{d}", value=True)
             with col2:
-                st.number_input("Amount (₹)", min_value=0.0, step=50.0, key=f"amt_{d}", disabled=True)
+                st.number_input("Amount (₹)", min_value=0.0, step=50.0, key=f"amt_{d}")
             with col3:
-                st.selectbox("Category", options=["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"], index=6, key=f"cat_{d}", disabled=True)
+                st.selectbox("Category", options=["Food", "Travel", "Bills", "Shopping", "Entertainment", "Health", "Other"], index=6, key=f"cat_{d}")
             st.markdown("<hr style='border-top:1px dotted rgba(242,236,221,0.1); margin: 0.5rem 0;'>", unsafe_allow_html=True)
             
         if st.form_submit_button("Save and Resolve Gaps"):
-            # Placeholder resolution for step 1
+            new_rows = []
+            for d in st.session_state.missing_dates:
+                is_zero_val = st.session_state.get(f"zero_{d}", True)
+                amt_val = st.session_state.get(f"amt_{d}", 0.0)
+                cat_val = st.session_state.get(f"cat_{d}", "Other")
+                
+                if is_zero_val:
+                    new_rows.append({
+                        "date": d,
+                        "description": "Zero Spend Baseline",
+                        "amount": 0.0,
+                        "category": "Other",
+                        "anomaly": 1
+                    })
+                else:
+                    new_rows.append({
+                        "date": d,
+                        "description": f"Gap entry for {d}",
+                        "amount": float(amt_val),
+                        "category": cat_val,
+                        "anomaly": 1
+                    })
+            
+            # Add pending entry
+            pending = st.session_state.pending_entry
+            new_rows.append({
+                "date": pending["date"],
+                "description": pending["description"],
+                "amount": float(pending["amount"]),
+                "category": pending["category"],
+                "anomaly": 1
+            })
+            
+            res_df = pd.DataFrame(new_rows)
+            st.session_state.data = pd.concat([st.session_state.data, res_df], ignore_index=True)
+            st.session_state.data = detect_anomalies(st.session_state.data)
+            
+            # Clear states
             st.session_state.resolving_gap = False
+            st.session_state.pending_entry = None
+            st.session_state.missing_dates = None
+            st.success("All entries backfilled and saved!")
             st.rerun()
     st.stop()
 
