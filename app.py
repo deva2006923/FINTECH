@@ -15,12 +15,32 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load credentials from .env (if present)
+load_dotenv()
 
 # Import custom architecture modules
 import auth as _auth
 from ml_pipeline import train_categorizer, categorize, detect_anomalies, forecast_next_period
 from assistant import parse_natural_language_query, execute_assistant_query, run_open_ended_analysis
 from helpers import generate_heatmap_html
+
+# Google OAuth component (loaded lazily — only if credentials are configured)
+try:
+    from streamlit_oauth import OAuth2Component as _OAuth2Component
+    _OAUTH_AVAILABLE = True
+except ImportError:
+    _OAUTH_AVAILABLE = False
+
+# Google OAuth constants
+_GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
+_GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+_GOOGLE_REDIRECT_URI  = "http://localhost:8501/"
+_GOOGLE_AUTH_URL      = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_TOKEN_URL     = "https://oauth2.googleapis.com/token"
+_GOOGLE_REVOKE_URL    = "https://oauth2.googleapis.com/revoke"
+_GOOGLE_SCOPE         = "openid email profile"
 
 # ----------------------------------------------------------------------
 # PAGE CONFIG
@@ -173,7 +193,11 @@ def show_login_page():
     # Center the form
     _, form_col, _ = st.columns([1, 2, 1])
     with form_col:
-        tab_in, tab_reg = st.tabs(["🔑  Sign In", "✨  Create Account"])
+        tab_in, tab_reg, tab_google = st.tabs([
+            "🔑  Sign In",
+            "✨  Create Account",
+            "🔵  Google",
+        ])
 
         # ── Sign In ──────────────────────────────────────────────────
         with tab_in:
@@ -219,10 +243,75 @@ def show_login_page():
                         st.session_state.auth_profile = result
                         st.session_state.data         = None
                         st.session_state.view_group   = False
-                        st.success(f"🎉 Account created! Your Ledger ID: **{result['user_id']}**")
+                        st.success(f"Account created! Your Ledger ID: **{result['user_id']}**")
                         st.rerun()
                     else:
                         st.error("Username already taken. Please choose a different one.")
+
+        # ── Google Sign In ────────────────────────────────────────────
+        with tab_google:
+            if not _OAUTH_AVAILABLE or not _GOOGLE_CLIENT_ID or not _GOOGLE_CLIENT_SECRET:
+                # Credentials not configured — show setup instructions
+                st.markdown("""
+                <div class="login-uid-info" style="text-align:left; padding:20px;">
+                    <b style="color:var(--gold);">Google Sign-In not configured.</b><br><br>
+                    Add your credentials to the <code>.env</code> file:<br><br>
+                    <code>GOOGLE_CLIENT_ID=....apps.googleusercontent.com</code><br>
+                    <code>GOOGLE_CLIENT_SECRET=your_secret</code><br><br>
+                    Then restart the app.
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="text-align:center; padding:16px 0 24px 0; font-family:'IBM Plex Mono',monospace;
+                            font-size:13px; color:var(--sage); opacity:0.85;">
+                    One click — no username or password needed.<br>
+                    Your Google account will be linked to a unique Ledger ID.
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Build the OAuth2 component
+                _oauth = _OAuth2Component(
+                    client_id     = _GOOGLE_CLIENT_ID,
+                    client_secret = _GOOGLE_CLIENT_SECRET,
+                    authorize_endpoint = _GOOGLE_AUTH_URL,
+                    token_endpoint     = _GOOGLE_TOKEN_URL,
+                    refresh_token_endpoint = _GOOGLE_TOKEN_URL,
+                    revoke_token_endpoint  = _GOOGLE_REVOKE_URL,
+                )
+
+                google_result = _oauth.authorize_button(
+                    name         = "Sign in with Google",
+                    redirect_uri = _GOOGLE_REDIRECT_URI,
+                    scope        = _GOOGLE_SCOPE,
+                    key          = "google_oauth_btn",
+                    use_container_width = True,
+                    extras_params= {"prompt": "select_account"},  # always show account picker
+                )
+
+                if google_result and "token" in google_result:
+                    _id_token = google_result["token"].get("id_token", "")
+                    _payload  = _auth.decode_google_id_token(_id_token)
+                    if _payload:
+                        _google_id = _payload.get("sub", "")
+                        _email     = _payload.get("email", "")
+                        _gname     = _payload.get("name", _email)
+                        _picture   = _payload.get("picture", "")
+
+                        _profile = _auth.register_or_login_google(
+                            _google_id, _email, _gname, _picture
+                        )
+                        if _profile:
+                            st.session_state.logged_in    = True
+                            st.session_state.auth_profile = _profile
+                            st.session_state.data         = None
+                            st.session_state.view_group   = False
+                            st.success(f"Welcome, {_gname}! Your Ledger ID: **{_profile['user_id']}**")
+                            st.rerun()
+                        else:
+                            st.error("Something went wrong creating your account. Please try again.")
+                    else:
+                        st.error("Could not decode Google token. Please try again.")
 
         # ── Info note ─────────────────────────────────────────────────
         st.markdown("""
@@ -231,6 +320,7 @@ def show_login_page():
             Share it with family members so they can invite you to their group.
         </div>
         """, unsafe_allow_html=True)
+
 
 
 # ----- Gate check ---------------------------------------------------------
@@ -291,7 +381,56 @@ with st.sidebar:
             st.session_state.auth_profile = _refreshed
             profile = _refreshed
 
+    # ── Google Account Linking ──────────────────────────────────────
+    _has_google = bool(profile.get("google_id"))
+    if _has_google:
+        st.markdown(
+            f'<div style="font-family:\'IBM Plex Mono\',monospace; font-size:12px; '
+            f'color:var(--sage); padding:6px 0; opacity:0.8;">'
+            f'🔵 Google linked · {profile.get("email","")}</div>',
+            unsafe_allow_html=True,
+        )
+    elif _OAUTH_AVAILABLE and _GOOGLE_CLIENT_ID and _GOOGLE_CLIENT_SECRET:
+        with st.expander("🔵  Link Google Account"):
+            st.markdown(
+                '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;'
+                'color:var(--sage);">Link your Google account for one-click login in future.</span>',
+                unsafe_allow_html=True,
+            )
+            _link_oauth = _OAuth2Component(
+                client_id     = _GOOGLE_CLIENT_ID,
+                client_secret = _GOOGLE_CLIENT_SECRET,
+                authorize_endpoint     = _GOOGLE_AUTH_URL,
+                token_endpoint         = _GOOGLE_TOKEN_URL,
+                refresh_token_endpoint = _GOOGLE_TOKEN_URL,
+                revoke_token_endpoint  = _GOOGLE_REVOKE_URL,
+            )
+            _link_result = _link_oauth.authorize_button(
+                name         = "Connect Google",
+                redirect_uri = _GOOGLE_REDIRECT_URI,
+                scope        = _GOOGLE_SCOPE,
+                key          = "google_link_btn",
+                use_container_width = True,
+                extras_params= {"prompt": "select_account"},
+            )
+            if _link_result and "token" in _link_result:
+                _lt      = _link_result["token"].get("id_token", "")
+                _lpay    = _auth.decode_google_id_token(_lt)
+                if _lpay:
+                    _auth.link_google(
+                        my_uid,
+                        _lpay.get("sub", ""),
+                        _lpay.get("email", ""),
+                        _lpay.get("picture", ""),
+                    )
+                    _u = _auth.get_user_by_uid(my_uid)
+                    if _u:
+                        st.session_state.auth_profile = _u
+                    st.success("Google account linked!")
+                    st.rerun()
+
     st.markdown("---")
+
 
     # ── Family Group Section ────────────────────────────────────────
     st.markdown('<div class="panel-title">👨‍👩‍👧 Family Group</div>', unsafe_allow_html=True)

@@ -1,4 +1,4 @@
-﻿"""
+"""
 auth.py — Authentication & Family Group Management
 ---------------------------------------------------
 Handles user registration, login, per-user profiles,
@@ -262,3 +262,94 @@ def list_group_members(group_id):
         if p:
             profiles.append(p)
     return profiles
+
+
+# ── Google OAuth Support ────────────────────────────────────────────────
+
+def decode_google_id_token(id_token):
+    """
+    Decode a Google ID token (JWT) without signature verification.
+    Returns the payload dict: { sub, email, name, picture, ... }
+    Google's token is already validated by the OAuth2 exchange — we just
+    need the claims payload here.
+    """
+    import base64
+    try:
+        parts = id_token.split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        # Add padding if needed
+        padding = (4 - len(payload_b64) % 4) % 4
+        payload_b64 += "=" * padding
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return payload
+    except Exception:
+        return None
+
+
+def register_or_login_google(google_id, email, display_name, picture=""):
+    """
+    Sign in (or sign up) via Google.
+
+    - If a user with this google_id already exists → return their profile (login).
+    - If the email is already registered (username/password account) → link Google
+      to that account and return it.
+    - Otherwise → create a brand new account automatically.
+
+    Returns the user profile dict.
+    """
+    users = _load_users()
+
+    # 1. Check for existing google_id match
+    for key, profile in users.items():
+        if profile.get("google_id") == google_id:
+            return dict(profile)
+
+    # 2. Check for email match (link Google to existing account)
+    for key, profile in users.items():
+        if profile.get("email", "").lower() == email.lower():
+            users[key]["google_id"] = google_id
+            users[key]["picture"]   = picture
+            _save_users(users)
+            return dict(users[key])
+
+    # 3. New Google user — create account automatically
+    uid = uuid.uuid4().hex[:8].upper()
+    # Use email prefix as the "username" key (slugified)
+    username_key = email.split("@")[0].lower().replace(".", "_").replace("+", "_")
+    # Ensure uniqueness
+    base_key, counter = username_key, 1
+    while username_key in users:
+        username_key = f"{base_key}_{counter}"
+        counter += 1
+
+    new_profile = {
+        "user_id":       uid,
+        "password_hash": None,          # no password — Google-only account
+        "display_name":  display_name or email.split("@")[0],
+        "email":         email,
+        "google_id":     google_id,
+        "picture":       picture,
+        "group_id":      None,
+    }
+    users[username_key] = new_profile
+    _save_users(users)
+    return new_profile
+
+
+def link_google(uid, google_id, email, picture=""):
+    """
+    Link an existing username/password account to a Google account.
+    Called when a logged-in user clicks 'Link Google Account'.
+    Returns True on success.
+    """
+    users = _load_users()
+    for key, profile in users.items():
+        if profile.get("user_id") == uid:
+            users[key]["google_id"] = google_id
+            users[key]["email"]     = email
+            users[key]["picture"]   = picture
+            _save_users(users)
+            return True
+    return False

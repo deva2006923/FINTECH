@@ -3,3 +3,6 @@ pandas
 numpy
 scikit-learn
 google-generativeai
+streamlit-oauth
+authlib
+python-dotenv
