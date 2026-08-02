@@ -257,6 +257,45 @@ def generate_sample_data(n=180, seed=42):
     df = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
     return df
 
+# ======================================================================
+# MACHINE LEARNING PIPELINE ARCHITECTURE
+# ======================================================================
+#
+# +--------------------------------------------------------------------+
+# |                        RAW TRANSACTION DATA                        |
+# |                 (Date, Description, Amount columns)                |
+# +--------------------------------------------------------------------+
+#                                   |
+#                                   v
+# +--------------------------------------------------------------------+
+# |                    STAGE 1: TEXT CATEGORIZATION                    |
+# |  - Model: TF-IDF Vectorizer + Multinomial Naive Bayes              |
+# |  - Training: Maps keyword-matching rules (Food, Travel, Bills,     |
+# |    Shopping, Entertainment, Health) to standard category tags      |
+# |  - Output: Predicts missing category names for custom CSV descriptions|
+# +--------------------------------------------------------------------+
+#                                   |
+#                                   v
+# +--------------------------------------------------------------------+
+# |                    STAGE 2: ANOMALY DETECTION                      |
+# |  - Model: Isolation Forest (contamination = 5%)                    |
+# |  - Features: [Transaction Amount, Day of Month]                    |
+# |  - Output: Outlier flags (-1 for anomalies, 1 for normal)          |
+# |  - Reasoning: Computes deviation ratios vs. category averages to   |
+# |    explain why outliers were flagged (e.g. 3x above average).      |
+# +--------------------------------------------------------------------+
+#                                   |
+#                                   v
+# +--------------------------------------------------------------------+
+# |                    STAGE 3: SPEND FORECASTING                      |
+# |  - Model: Ordinary Least Squares (OLS) Linear Regression           |
+# |  - Aggregator: Groups transactions by date to compute daily totals |
+# |  - Feature: Number of days since first transaction (t)             |
+# |  - Output: Predicts daily spending trend for next 7-60 days        |
+# +--------------------------------------------------------------------+
+#
+# ======================================================================
+
 # ----------------------------------------------------------------------
 # ML: CATEGORIZATION (TF-IDF + Naive Bayes, trained on keyword rules as labels)
 # ----------------------------------------------------------------------
