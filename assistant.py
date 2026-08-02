@@ -8,9 +8,45 @@ except ImportError:
 from datetime import datetime, timedelta
 
 
-def parse_natural_language_query(query, df):
+def parse_natural_language_query(query, df, history=None):
     query = query.lower().strip()
     
+    # 0. Contextual resolution from history for pronouns like "those", "week before", "highest"
+    last_query_meta = {}
+    if history and len(history) > 0:
+        # Find last user/assistant interaction metadata
+        for msg in reversed(history):
+            if isinstance(msg, dict) and "meta" in msg:
+                last_query_meta = msg["meta"]
+                break
+
+    # Resolve "the week before" or "previous week"
+    if ("week before" in query or "previous week" in query) and "start_date" in last_query_meta and last_query_meta["start_date"]:
+        prev_start = last_query_meta["start_date"] - timedelta(days=7)
+        prev_end = last_query_meta["start_date"] - timedelta(days=1)
+        cat = last_query_meta.get("category")
+        return {
+            "type": "spend_summary",
+            "category": cat,
+            "start_date": prev_start,
+            "end_date": prev_end,
+            "query": query
+        }
+
+    # Resolve "highest", "which of those", "max"
+    if ("highest" in query or "max" in query or "largest" in query or "those" in query) and last_query_meta:
+        cat = last_query_meta.get("category")
+        start = last_query_meta.get("start_date")
+        end = last_query_meta.get("end_date")
+        return {
+            "type": "top_spend",
+            "category": cat,
+            "limit": 1 if ("highest" in query or "max" in query) else 5,
+            "start_date": start,
+            "end_date": end,
+            "query": query
+        }
+
     # Standardize keywords to detect timeframes
     today = datetime.today().date()
     df_dates = pd.to_datetime(df["date"]).dt.date
@@ -19,6 +55,7 @@ def parse_natural_language_query(query, df):
     
     start_date = None
     end_date = max_date
+
     
     # 1. Check date keywords
     if "last week" in query:
