@@ -38,7 +38,7 @@ except ImportError:
 # Google OAuth constants
 _GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
 _GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-_GOOGLE_REDIRECT_URI  = "http://localhost:8501/"
+_GOOGLE_REDIRECT_URI  = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8501/").strip()
 _GOOGLE_AUTH_URL      = "https://accounts.google.com/o/oauth2/v2/auth"
 _GOOGLE_TOKEN_URL     = "https://oauth2.googleapis.com/token"
 _GOOGLE_REVOKE_URL    = "https://oauth2.googleapis.com/revoke"
