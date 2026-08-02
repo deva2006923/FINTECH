@@ -967,46 +967,186 @@ with tab_ai:
 
 # ── TAB 5: FAMILY TRACKER & GROUP ID ──────────────────────────────────
 with tab_family:
-    col_g1, col_g2 = st.columns(2, gap="large")
-    with col_g1:
-        st.markdown('<div class="panel-title">👨‍👩‍👧 Join / Add Group by Ledger ID</div>', unsafe_allow_html=True)
-        with st.form("join_group_by_id_form"):
-            join_id = st.text_input("Enter 8-character Ledger ID", max_chars=8, placeholder="e.g. 450208EE").strip().upper()
-            join_submit = st.form_submit_button("➕ Connect & Send Invite", use_container_width=True)
+    current_group_id = st.session_state.get("active_group_id")
+    
+    if current_group_id:
+        df_group = load_group_ledger(current_group_id, my_uid)
+        
+        # Run auto-categorization
+        vec_g, clf_g, _ = train_categorizer(df_group)
+        df_group = categorize(df_group, vec_g, clf_g)
+        
+        g_total_spend = df_group["amount"].sum()
+        g_by_cat = df_group.groupby("category")["amount"].sum().sort_values(ascending=False)
+        
+        st.markdown(f"### 👨‍👩‍👧 Family Aggregated Ledger — Group {current_group_id.replace('GRP_','')}")
+        
+        col_fam_left, col_fam_right = st.columns([4, 6], gap="large")
+        
+        with col_fam_left:
+            # 🧾 Family Receipt
+            rows_fam_html = ""
+            for cat, amt in g_by_cat.items():
+                rows_fam_html += (
+                    f'<div class="receipt-row">'
+                    f'<span class="cat">{cat}</span>'
+                    f'<span class="amt">₹{amt:,.2f}</span>'
+                    f'</div>'
+                )
+            
+            member_breakdown_html = ""
+            by_member = df_group.groupby("user_id")["amount"].sum().sort_values(ascending=False)
+            for uid_m, amt_m in by_member.items():
+                u_prof = _auth.get_user_by_uid(uid_m)
+                u_name = u_prof["display_name"] if u_prof else uid_m
+                member_breakdown_html += (
+                    f'<div class="receipt-row" style="opacity:0.8;">'
+                    f'<span class="cat">👤 {u_name}</span>'
+                    f'<span class="amt">₹{amt_m:,.2f}</span>'
+                    f'</div>'
+                )
+                
+            st.markdown(f"""
+            <div class="receipt">
+                <div class="receipt-header">
+                    <div class="label">Family Total Spend · Last 90 Days</div>
+                    <div class="amount">₹{g_total_spend:,.2f}</div>
+                </div>
+                {rows_fam_html}
+                <div class="receipt-header" style="margin-top:20px;"><div class="label">Member Contribution</div></div>
+                {member_breakdown_html}
+                <div class="receipt-footer">★ Connected Family Ledger ★</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # 📊 Category Spending Graph
+            with st.container(border=True):
+                st.markdown('<div class="panel-title">📊 Category Spending (All Members)</div>', unsafe_allow_html=True)
+                by_cat_fam_df = df_group.groupby("category")["amount"].sum().reset_index()
+                if not by_cat_fam_df.empty:
+                    st.bar_chart(by_cat_fam_df.set_index("category")["amount"], height=200)
+                else:
+                    st.markdown('<span class="mono">No family expense data.</span>', unsafe_allow_html=True)
+                    
+        with col_fam_right:
+            # 📅 Calendar Heatmap
+            with st.container(border=True):
+                st.markdown('<div class="panel-title">📅 Family Calendar Heatmap</div>', unsafe_allow_html=True)
+                st.markdown(generate_heatmap_html(df_group), unsafe_allow_html=True)
+                
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # ⚙️ Group Management UI
+            st.markdown("#### ⚙️ Group Management")
+            mc1, mc2 = st.columns(2)
+            with mc1:
+                st.markdown("##### Members List")
+                gdata = _auth.get_group(current_group_id)
+                if gdata:
+                    for uid_m in gdata.get("members", []):
+                        mp = _auth.get_user_by_uid(uid_m)
+                        m_name = mp["display_name"] if mp else uid_m
+                        is_me = (uid_m == my_uid)
+                        st.markdown(f"- **{m_name}** {'(You)' if is_me else ''} (`{uid_m}`)")
+                        
+                st.markdown("")
+                is_host = (gdata.get("host_uid") == my_uid) if gdata else False
+                leave_label = "Disband Group" if is_host and len(gdata.get("members", [])) <= 1 else "Leave Group"
+                if st.button(leave_label, key="leave_group_btn_family_tab", use_container_width=True):
+                    _auth.leave_group(current_group_id, my_uid)
+                    _u = _auth.get_user_by_uid(my_uid)
+                    if _u: st.session_state.auth_profile = _u
+                    st.session_state.active_group_id = None
+                    st.rerun()
+                    
+            with mc2:
+                st.markdown("##### Invite/Connect")
+                with st.form("invite_member_family_tab"):
+                    invite_id = st.text_input("Enter Member Ledger ID", max_chars=8, placeholder="e.g. 42759563").strip().upper()
+                    invite_submit = st.form_submit_button("Send Invitation", use_container_width=True)
+                    
+                if invite_submit:
+                    if not invite_id:
+                        st.error("Please enter a valid Ledger ID.")
+                    else:
+                        res = _auth.invite_member(current_group_id, invite_id)
+                        if res == "ok":
+                            st.success(f"✅ Invitation sent to {invite_id}!")
+                        elif res == "not_found":
+                            st.error("Ledger ID not found.")
+                        elif res == "already_member":
+                            st.warning("Already a group member.")
+                        elif res == "already_invited":
+                            st.info("Already invited.")
+                            
+        # Family Search Filters and History Table
+        st.markdown("---")
+        st.markdown('<div class="panel-title">👨‍👩‍👧 Family Ledger History & Search</div>', unsafe_allow_html=True)
+        col_fam_f1, col_fam_f2 = st.columns(2)
+        with col_fam_f1:
+            unique_fam_categories = sorted(df_group["category"].unique())
+            selected_fam_category = st.selectbox("Filter Family Category", ["All Categories"] + list(unique_fam_categories), key="fam_cat_filt")
+        with col_fam_f2:
+            min_fam_date = df_group["date"].min()
+            max_fam_date = df_group["date"].max()
+            if pd.isnull(min_fam_date): min_fam_date = datetime.today().date()
+            if pd.isnull(max_fam_date): max_fam_date = datetime.today().date()
+            fam_date_range = st.date_input("Filter Family Date Range", value=(min_fam_date, max_fam_date), key="fam_dt_filt")
 
-        if join_submit:
-            if not join_id:
-                st.error("Please enter a valid Ledger ID.")
-            else:
-                curr_gid = st.session_state.get("active_group_id")
-                if not curr_gid:
+        start_fam_date, end_fam_date = min_fam_date, max_fam_date
+        if isinstance(fam_date_range, tuple):
+            if len(fam_date_range) == 2: start_fam_date, end_fam_date = fam_date_range
+            elif len(fam_date_range) == 1: start_fam_date = end_fam_date = fam_date_range[0]
+            
+        df_fam_filtered = df_group[
+            (df_group["date"] >= start_fam_date) & 
+            (df_group["date"] <= end_fam_date)
+        ]
+        if selected_fam_category != "All Categories":
+            df_fam_filtered = df_fam_filtered[df_fam_filtered["category"] == selected_fam_category]
+
+        st.dataframe(
+            df_fam_filtered.sort_values("date", ascending=False),
+            use_container_width=True,
+            column_config={
+                "amount": st.column_config.NumberColumn("Amount (₹)", format="₹%.2f"),
+                "date": st.column_config.DateColumn("Date"),
+                "description": "Description",
+                "category": "Category",
+                "user_id": "Ledger ID",
+                "anomaly": None
+            }
+        )
+                            
+    else:
+        st.info("💡 You are not currently in any Family Group. Join an existing group or host your own below!")
+        st.markdown("---")
+        fc1, fc2 = st.columns(2, gap="large")
+        with fc1:
+            st.markdown("#### 🏠 Host a New Family Group")
+            if st.button("Host Family Group", key="host_group_family_tab_no_group", use_container_width=True):
+                new_gid = _auth.create_group(my_uid, profile.get("display_name", my_uid))
+                _u = _auth.get_user_by_uid(my_uid)
+                if _u: st.session_state.auth_profile = _u
+                st.session_state.active_group_id = new_gid
+                st.rerun()
+        with fc2:
+            st.markdown("#### ➕ Join Group via Ledger ID")
+            with st.form("join_group_family_tab_no_group"):
+                host_id = st.text_input("Enter Family Member's Ledger ID", max_chars=8, placeholder="e.g. 450208EE").strip().upper()
+                join_submit = st.form_submit_button("Connect", use_container_width=True)
+                
+            if join_submit:
+                if not host_id:
+                    st.error("Please enter a valid Ledger ID.")
+                else:
                     curr_gid = _auth.create_group(my_uid, profile.get("display_name", my_uid))
                     st.session_state.active_group_id = curr_gid
-
-                res = _auth.invite_member(curr_gid, join_id)
-                if res == "ok":
-                    st.success(f"✅ Invitation sent to Ledger ID {join_id}!")
-                elif res == "not_found":
-                    st.error("Ledger ID not found. Verify the exact 8-character ID.")
-                elif res == "already_member":
-                    st.warning("User is already in your group.")
-                elif res == "already_invited":
-                    st.info("Invitation already sent.")
-
-    with col_g2:
-        st.markdown('<div class="panel-title">👥 Group Members & Ledger Switcher</div>', unsafe_allow_html=True)
-        if current_group_id:
-            gdata = _auth.get_group(current_group_id)
-            if gdata:
-                for uid in gdata.get("members", []):
-                    mp = _auth.get_user_by_uid(uid)
-                    m_name = mp["display_name"] if mp else uid
-                    is_me = (uid == my_uid)
-                    st.markdown(
-                        f'<div class="receipt-row" style="align-items:center; padding:8px 0;">'
-                        f'<span class="mono">👤 <b>{m_name}</b> {"(You)" if is_me else ""}</span>'
-                        f'<span class="mono" style="color:var(--gold);">{uid}</span></div>',
-                        unsafe_allow_html=True
-                    )
-        else:
-            st.info("No active family group selected. Host or join a group to start tracking together!")
+                    res = _auth.invite_member(curr_gid, host_id)
+                    if res == "ok":
+                        st.success(f"✅ Created group & sent invite to {host_id}!")
+                        st.rerun()
+                    else:
+                        st.error(f"Could not connect: {res}")
