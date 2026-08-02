@@ -960,50 +960,87 @@ with col_right:
             """
             st.markdown(cm_table, unsafe_allow_html=True)
 
-# ---------------- FULL TABLE ----------------
-st.markdown('<div class="panel-title" style="margin-top:1.5rem;">All Transactions</div>', unsafe_allow_html=True)
+# ---------------- LEDGER HISTORY VIEWS ----------------
+st.markdown('<div class="panel-title" style="margin-top:1.5rem;">Ledger History & Analysis</div>', unsafe_allow_html=True)
 
-# Filters above the table
-col_filter1, col_filter2 = st.columns(2)
-with col_filter1:
-    unique_categories = sorted(df["category"].unique())
-    selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories))
-with col_filter2:
-    min_date = df["date"].min()
-    max_date = df["date"].max()
-    if pd.isnull(min_date):
-        min_date = datetime.today().date()
-    if pd.isnull(max_date):
-        max_date = datetime.today().date()
-    
-    date_range = st.date_input(
-        "Filter by Date Range",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date,
+view_mode = st.radio(
+    "Select View Mode",
+    options=["Table List", "Calendar Heatmap", "Spending Trend Chart"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+if view_mode == "Table List":
+    # Filters above the table
+    col_filter1, col_filter2 = st.columns(2)
+    with col_filter1:
+        unique_categories = sorted(df["category"].unique())
+        selected_category = st.selectbox("Filter by Category", ["All Categories"] + list(unique_categories))
+    with col_filter2:
+        min_date = df["date"].min()
+        max_date = df["date"].max()
+        if pd.isnull(min_date):
+            min_date = datetime.today().date()
+        if pd.isnull(max_date):
+            max_date = datetime.today().date()
+        
+        date_range = st.date_input(
+            "Filter by Date Range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+        )
+
+    # Extract date bounds safely
+    start_date = min_date
+    end_date = max_date
+    if isinstance(date_range, tuple):
+        if len(date_range) == 2:
+            start_date, end_date = date_range
+        elif len(date_range) == 1:
+            start_date = date_range[0]
+            end_date = date_range[0]
+    elif date_range:
+        start_date = date_range
+        end_date = date_range
+
+    # Apply filters
+    df_table = df.copy()
+    if selected_category != "All Categories":
+        df_table = df_table[df_table["category"] == selected_category]
+    df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
+
+    st.dataframe(
+        df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
+        use_container_width=True,
+        height=300,
     )
 
-# Extract date bounds safely
-start_date = min_date
-end_date = max_date
-if isinstance(date_range, tuple):
-    if len(date_range) == 2:
-        start_date, end_date = date_range
-    elif len(date_range) == 1:
-        start_date = date_range[0]
-        end_date = date_range[0]
-elif date_range:
-    start_date = date_range
-    end_date = date_range
+elif view_mode == "Calendar Heatmap":
+    st.markdown(generate_heatmap_html(df), unsafe_allow_html=True)
+    st.markdown("""
+    <div style="display:flex; justify-content:center; gap:10px; font-size:0.75rem; font-family:'IBM Plex Mono', monospace; opacity:0.75; margin-top:8px;">
+        <span>Less</span>
+        <div style="width:12px; height:12px; background:#2c3b37; border-radius:2px;"></div>
+        <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.25); border-radius:2px;"></div>
+        <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.5); border-radius:2px;"></div>
+        <div style="width:12px; height:12px; background:rgba(124, 152, 133, 0.75); border-radius:2px;"></div>
+        <div style="width:12px; height:12px; background:rgb(124, 152, 133); border-radius:2px;"></div>
+        <span>More</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-# Apply filters
-df_table = df.copy()
-if selected_category != "All Categories":
-    df_table = df_table[df_table["category"] == selected_category]
-df_table = df_table[(df_table["date"] >= start_date) & (df_table["date"] <= end_date)]
-
-st.dataframe(
-    df_table.sort_values("date", ascending=False)[["date", "description", "amount", "category", "anomaly"]],
-    use_container_width=True,
-    height=300,
-)
+else:
+    col_chart_toggle1, col_chart_toggle2 = st.columns([1.5, 3])
+    with col_chart_toggle1:
+        chart_type = st.radio("Chart Type", ["Line Chart", "Bar Chart"], horizontal=True)
+        
+    df_trend = df.copy()
+    df_trend["date_parsed"] = pd.to_datetime(df_trend["date"])
+    daily_spend_df = df_trend.groupby("date_parsed")["amount"].sum().reset_index()
+    daily_spend_df = daily_spend_df.rename(columns={"amount": "Daily Spend"}).set_index("date_parsed")
+    
+    if chart_type == "Line Chart":
+        st.line_chart(daily_spend_df, height=300)
+    else:
+        st.bar_chart(daily_spend_df, height=300)
