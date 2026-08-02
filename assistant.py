@@ -357,11 +357,39 @@ def execute_assistant_query(parsed, df):
     return None
 
 def get_local_fallback_summary(query, df):
+    q_lower = query.lower()
     total_spend = df["amount"].sum()
     by_cat = df.groupby("category")["amount"].sum().sort_values(ascending=False)
     anoms = df[df["anomaly"] == -1]
     
-    summary = f"**Ledger Financial Health Summary:**<br>"
+    summary = ""
+    
+    # Render chart FIRST if requested
+    if any(term in q_lower for term in ["pie", "pie chart", "bar", "bargraph", "bar chart", "chart", "graph", "plot"]):
+        max_val = by_cat.max() if not by_cat.empty and by_cat.max() > 0 else 1.0
+        colors = ["#D4AF37", "#7C9885", "#C1502E", "#2C3B37", "#4A6B6C", "#9A8C98", "#C9ADA7"]
+        
+        is_pie = "pie" in q_lower
+        title = "🥧 Category Breakdown (Pie View)" if is_pie else "📊 Category Spending Bar Graph"
+        
+        summary += f"<div style='margin-bottom:14px; background:rgba(212,175,55,0.08); padding:10px; border-radius:6px; border:1px solid rgba(212,175,55,0.25);'>" \
+                   f"<b style='color:var(--gold); font-size:13px;'>{title}</b><br><br>"
+        
+        if not by_cat.empty:
+            for i, (cat, amt) in enumerate(by_cat.items()):
+                pct = (amt / total_spend * 100) if total_spend > 0 else 0
+                color = colors[i % len(colors)] if is_pie else "#D4AF37"
+                width_pct = int((amt / max_val) * 100) if not is_pie else int(pct)
+                summary += f"<div style='margin-bottom:6px;'>" \
+                           f"<div style='display:flex; justify-content:space-between; font-size:11px; font-weight:600;'>" \
+                           f"<span><span style='color:{color};'>●</span> {cat} ({pct:.1f}%)</span><span>₹{amt:,.2f}</span></div>" \
+                           f"<div style='background:rgba(212,175,55,0.15); border-radius:3px; height:8px; margin-top:2px;'>" \
+                           f"<div style='background:{color}; width:{max(2, width_pct)}%; height:100%; border-radius:3px;'></div></div></div>"
+        else:
+            summary += "*No expense data found.*"
+        summary += "</div>"
+        
+    summary += f"**Ledger Financial Health Summary:**<br>"
     summary += f"Total logged expenses sum to ₹{total_spend:,.2f}.<br>"
     
     if not by_cat.empty:
@@ -371,34 +399,22 @@ def get_local_fallback_summary(query, df):
         summary += f"- Your highest spending category is **{top_cat}** at ₹{top_cat_spend:,.2f} ({pct:.1f}% of total).<br>"
         
     if len(anoms) > 0:
-        summary += f"- Standard Isolation Forest model has flagged **{len(anoms)} unusual transaction(s)**. We recommend reviewing these flags in the 'Anomaly Flags' view.<br>"
+        summary += f"- Standard Isolation Forest model has flagged **{len(anoms)} unusual transaction(s)**.<br>"
     else:
-        summary += f"- No critical spending anomalies have been flagged in your recent logs.<br>"
+        summary += f"- No critical spending anomalies flagged.<br>"
         
-    # Budget tips based on top spending category
     summary += "<br>**Advice/Tips:**<br>"
     if not by_cat.empty:
         if top_cat == "Food":
-            summary += "→ *Food Spend*: High restaurant/groceries spend. Consider meal-prepping or planning weekly dining budgets to cut costs by 15-20%.<br>"
+            summary += "→ *Food Spend*: Consider meal-prepping or planning weekly dining budgets to cut costs by 15-20%.<br>"
         elif top_cat == "Bills":
-            summary += "→ *Bills*: High fixed overhead. Review recurring subscriptions or utilities for potential plan downgrades.<br>"
+            summary += "→ *Bills*: Review recurring subscriptions for potential downgrades.<br>"
         elif top_cat == "Shopping":
-            summary += "→ *Shopping*: High discretionary purchasing. Try implementing the '24-hour rule' before finalizing shopping cart orders.<br>"
+            summary += "→ *Shopping*: Try implementing the '24-hour rule' before finalizing cart orders.<br>"
         else:
-            summary += f"→ *{top_cat}*: This is your primary expense driver. Consider tracking individual items to optimize outflows.<br>"
+            summary += f"→ *{top_cat}*: Primary expense driver. Consider tracking individual items.<br>"
             
-    summary += "→ *General advice*: Setting aside an automated 10-20% baseline savings chunk at the start of each month can safeguard your long-term buffer."
-    
-    if any(term in query.lower() for term in ["bar graph", "bargraph", "chart", "graph", "plot"]):
-        summary += "<br><br>📊 **Category Spending Bar Graph:**<br>"
-        max_val = by_cat.max() if not by_cat.empty and by_cat.max() > 0 else 1.0
-        for cat, amt in by_cat.items():
-            pct = int((amt / max_val) * 100)
-            summary += f"<div style='margin-top:6px;'>" \
-                       f"<div style='display:flex; justify-content:space-between; font-size:11px;'>" \
-                       f"<span>{cat}</span><span>₹{amt:,.2f}</span></div>" \
-                       f"<div style='background:rgba(212,175,55,0.2); border-radius:3px; height:10px; margin-top:2px;'>" \
-                       f"<div style='background:#D4AF37; width:{pct}%; height:100%; border-radius:3px;'></div></div></div>"
+    summary += "→ *General advice*: Setting aside an automated 10-20% baseline savings chunk safeguards your buffer."
                        
     return summary
 
