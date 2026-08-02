@@ -222,6 +222,11 @@ if "auth_profile" not in st.session_state:
 
 def show_login_page():
     """Premium login page — Google is the primary (and only) sign-in method."""
+    global _GOOGLE_CLIENT_ID, _GOOGLE_CLIENT_SECRET
+    load_dotenv(dotenv_path=_ENV_PATH, override=True)
+    _GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    _GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    
     # Hide sidebar on login page
     st.markdown(
         "<style>section[data-testid='stSidebar']{display:none!important}</style>",
