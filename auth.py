@@ -269,6 +269,20 @@ def get_pending_invites(uid):
     return result
 
 
+def get_user_groups(uid):
+    """
+    Return a list of all group dicts that the given user belongs to.
+    """
+    groups = _load_groups()
+    res = []
+    for gid, gdata in groups.items():
+        if uid in gdata.get("members", []):
+            res.append(dict(gdata))
+    return res
+
+
+
+
 def list_group_members(group_id):
     """
     Return list of profile dicts for all members in a group.
