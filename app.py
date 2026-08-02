@@ -229,6 +229,34 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.panel-marker) > div {
     padding: 0 !important;
 }
 
+/* Conversational AI Assistant note styled like a stapled receipt memo */
+.stapled-note {
+    background: #F2ECDD !important;
+    color: #1B2A26 !important;
+    border-left: 5px solid var(--gold) !important;
+    padding: 1.2rem 1.4rem !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.85rem !important;
+    position: relative !important;
+    box-shadow: 2px 4px 12px rgba(0,0,0,0.15) !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: 2px !important;
+}
+.stapled-note::before {
+    content: "" !important;
+    position: absolute !important;
+    top: -5px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 38px !important;
+    height: 10px !important;
+    background: rgba(193, 80, 46, 0.5) !important; /* Stamped ink dark red staple marker */
+    border-left: 2px solid rgba(0,0,0,0.1) !important;
+    border-right: 2px solid rgba(0,0,0,0.1) !important;
+    border-radius: 1px !important;
+}
+
 /* Heatmap Container */
 .heatmap-scroll-container {
     overflow-x: auto;
@@ -1196,6 +1224,25 @@ with col_right:
             </table>
             """
             st.markdown(cm_table, unsafe_allow_html=True)
+
+    with st.container(border=True):
+        st.markdown('<div class="panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">💬 AI Ledger Assistant</div>', unsafe_allow_html=True)
+        
+        query_input = st.text_input("Ask about your spending data:", placeholder="e.g., How much did I spend on Food this month?")
+        
+        if query_input:
+            parsed = parse_natural_language_query(query_input, df)
+            response_html = execute_assistant_query(parsed, df)
+            
+            if response_html:
+                st.markdown(f'<div class="stapled-note">{response_html}</div>', unsafe_allow_html=True)
+            else:
+                # Placeholder response for step 6
+                mock_html = f"<div class='mono' style='font-size:0.85rem; line-height:1.4; color:#1B2A26;'>" \
+                            f"Parsed Query: *{query_input}*<br><br>" \
+                            f"🤖 local advisor: That query requires open-ended analysis. I will generate a response shortly...</div>"
+                st.markdown(f'<div class="stapled-note">{mock_html}</div>', unsafe_allow_html=True)
 
 # ---------------- LEDGER HISTORY VIEWS ----------------
 st.markdown('<div class="panel-title" style="margin-top:1.5rem;">Ledger History & Analysis</div>', unsafe_allow_html=True)
