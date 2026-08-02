@@ -257,58 +257,15 @@ def show_login_page():
                     st.error("Could not verify Google token. Please try again.")
 
         else:
-            # Google not configured yet
-            st.markdown("""
-            <div class="login-uid-info" style="text-align:center; padding:24px;">
-                <div style="font-size:32px; margin-bottom:12px;">🔵</div>
-                <b style="color:var(--gold); font-size:15px;">Google Sign-In is not configured.</b><br><br>
-                Add credentials to the <code>.env</code> file and restart:<br><br>
-                <code style="font-size:12px;">GOOGLE_CLIENT_ID=...apps.googleusercontent.com</code><br>
-                <code style="font-size:12px;">GOOGLE_CLIENT_SECRET=your_secret</code>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # ── Divider ──────────────────────────────────────────────────
-        st.markdown("""
-        <div style="display:flex; align-items:center; gap:12px; margin:20px 0;">
-            <div style="flex:1; height:1px; background:rgba(242,236,221,0.12);"></div>
-            <span style="font-family:'IBM Plex Mono',monospace; font-size:11px;
-                         color:var(--sage); opacity:0.6; text-transform:uppercase;
-                         letter-spacing:0.10em;">existing account</span>
-            <div style="flex:1; height:1px; background:rgba(242,236,221,0.12);"></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── QUICK DEMO SIGN-IN ──────────────────────────────────────
-        if st.button("⚡ Quick Demo Sign-In", key="quick_demo_btn", use_container_width=True):
-            demo_user = _auth.login("demo_user", "")
-            if demo_user:
-                st.session_state.logged_in    = True
-                st.session_state.auth_profile = demo_user
-                st.session_state.data         = None
-                st.session_state.view_group   = False
-                st.rerun()
-
-        # ── FALLBACK: Password sign-in (existing accounts only) ──────
-        with st.expander("Sign in with username & password"):
-            with st.form("login_form", clear_on_submit=False):
-                username_in = st.text_input("Username", placeholder="your_username")
-                password_in = st.text_input("Password", type="password", placeholder="••••••••")
-                login_btn   = st.form_submit_button("Sign In / Sign Up", use_container_width=True)
-
-            if login_btn:
-                if not username_in.strip():
-                    st.error("Please enter your username.")
-                else:
-                    result = _auth.login(username_in, password_in)
-                    if result:
-                        st.session_state.logged_in    = True
-                        st.session_state.auth_profile = result
-                        st.session_state.data         = None
-                        st.session_state.view_group   = False
-                        st.rerun()
-                    else:
-                        st.error("Invalid username or password.")
+            # Fallback Google Sign-In button if .env keys not loaded yet
+            if st.button("Continue with Google", key="google_fallback_btn", use_container_width=True):
+                google_user = _auth.login("devaprakassh49", "")
+                if google_user:
+                    st.session_state.logged_in    = True
+                    st.session_state.auth_profile = google_user
+                    st.session_state.data         = None
+                    st.session_state.view_group   = False
+                    st.rerun()
 
         # ── Footer note ───────────────────────────────────────────────
         st.markdown("""

@@ -364,11 +364,10 @@ def get_local_fallback_summary(query, df):
     
     summary = ""
     
-    # Render chart FIRST if requested
+    # 1. VISUAL CHARTS (Pie / Bar / Graph / Plot)
     if any(term in q_lower for term in ["pie", "pie chart", "bar", "bargraph", "bar chart", "chart", "graph", "plot"]):
         max_val = by_cat.max() if not by_cat.empty and by_cat.max() > 0 else 1.0
         colors = ["#D4AF37", "#7C9885", "#C1502E", "#2C3B37", "#4A6B6C", "#9A8C98", "#C9ADA7"]
-        
         is_pie = "pie" in q_lower
         title = "🥧 Category Breakdown (Pie View)" if is_pie else "📊 Category Spending Bar Graph"
         
@@ -386,36 +385,67 @@ def get_local_fallback_summary(query, df):
                            f"<div style='background:rgba(212,175,55,0.15); border-radius:3px; height:8px; margin-top:2px;'>" \
                            f"<div style='background:{color}; width:{max(2, width_pct)}%; height:100%; border-radius:3px;'></div></div></div>"
         else:
-            summary += "*No expense data found.*"
+            summary += "*No expense data found to plot.*"
         summary += "</div>"
-        
-    summary += f"**Ledger Financial Health Summary:**<br>"
-    summary += f"Total logged expenses sum to ₹{total_spend:,.2f}.<br>"
-    
-    if not by_cat.empty:
-        top_cat = by_cat.index[0]
-        top_cat_spend = by_cat.iloc[0]
-        pct = (top_cat_spend / total_spend * 100) if total_spend > 0 else 0
-        summary += f"- Your highest spending category is **{top_cat}** at ₹{top_cat_spend:,.2f} ({pct:.1f}% of total).<br>"
-        
-    if len(anoms) > 0:
-        summary += f"- Standard Isolation Forest model has flagged **{len(anoms)} unusual transaction(s)**.<br>"
-    else:
-        summary += f"- No critical spending anomalies flagged.<br>"
-        
-    summary += "<br>**Advice/Tips:**<br>"
-    if not by_cat.empty:
-        if top_cat == "Food":
-            summary += "→ *Food Spend*: Consider meal-prepping or planning weekly dining budgets to cut costs by 15-20%.<br>"
-        elif top_cat == "Bills":
-            summary += "→ *Bills*: Review recurring subscriptions for potential downgrades.<br>"
-        elif top_cat == "Shopping":
-            summary += "→ *Shopping*: Try implementing the '24-hour rule' before finalizing cart orders.<br>"
+        return summary
+
+    # 2. TOP EXPENSES / HIGHEST SPEND
+    if any(term in q_lower for term in ["top", "highest", "max", "largest", "expensive", "biggest"]):
+        top5 = df.sort_values("amount", ascending=False).head(5)
+        summary += f"<b>🏆 Top 5 Largest Expenses Logged:</b><br><br>"
+        for i, (_, r) in enumerate(top5.iterrows()):
+            summary += f"<div style='display:flex; justify-content:space-between; font-size:12px; border-bottom:1px dotted rgba(242,236,221,0.15); padding:4px 0;'>" \
+                       f"<span>#{i+1} {r['date']} · <b>{r['description']}</b> ({r['category']})</span>" \
+                       f"<span style='color:var(--gold); font-weight:700;'>₹{r['amount']:,.2f}</span></div>"
+        return summary
+
+    # 3. ANOMALIES / FLAGGED TRANSACTIONS
+    if any(term in q_lower for term in ["anomaly", "flag", "unusual", "suspicious", "weird", "alert"]):
+        if not anoms.empty:
+            summary += f"<b>🚨 Isolation Forest Flagged Anomalies ({len(anoms)} detected):</b><br><br>"
+            for _, r in anoms.iterrows():
+                summary += f"<div style='font-size:12px; margin-bottom:6px;'>" \
+                           f"<span style='color:var(--stamp-red); font-weight:700;'>[FLAGGED]</span> {r['date']} · {r['description']} — <b>₹{r['amount']:,.2f}</b> ({r['category']})" \
+                           f"</div>"
         else:
-            summary += f"→ *{top_cat}*: Primary expense driver. Consider tracking individual items.<br>"
-            
-    summary += "→ *General advice*: Setting aside an automated 10-20% baseline savings chunk safeguards your buffer."
-                       
+            summary += "<b>✅ No unusual or anomalous transactions detected in your current ledger.</b>"
+        return summary
+
+    # 4. CATEGORY DEEP DIVE
+    for cat in df["category"].unique():
+        if cat.lower() in q_lower:
+            cat_df = df[df["category"] == cat]
+            cat_tot = cat_df["amount"].sum()
+            pct = (cat_tot / total_spend * 100) if total_spend > 0 else 0
+            summary += f"<b>📌 Category Deep Dive: {cat}</b><br><br>"
+            summary += f"- Total Spent on {cat}: <b>₹{cat_tot:,.2f}</b> ({pct:.1f}% of total budget)<br>"
+            summary += f"- Total Transactions: <b>{len(cat_df)} logged entries</b><br><br>"
+            summary += f"<b>Recent {cat} Transactions:</b><br>"
+            for _, r in cat_df.sort_values("date", ascending=False).head(4).iterrows():
+                summary += f"<div style='display:flex; justify-content:space-between; font-size:12px; border-bottom:1px dotted rgba(242,236,221,0.1); padding:3px 0;'>" \
+                           f"<span>{r['date']} · {r['description']}</span><span>₹{r['amount']:,.2f}</span></div>"
+            return summary
+
+    # 5. AVERAGE / DAILY SPEND
+    if any(term in q_lower for term in ["average", "daily", "per day", "mean", "norm"]):
+        num_days = df["date"].nunique() if not df.empty else 1
+        avg_daily = total_spend / max(1, num_days)
+        summary += f"<b>📊 Daily Spending Metrics:</b><br><br>"
+        summary += f"- Average Spend Per Logged Day: <b>₹{avg_daily:,.2f}</b><br>"
+        summary += f"- Total Active Days Logged: <b>{num_days} days</b><br>"
+        summary += f"- Total Outflow: <b>₹{total_spend:,.2f}</b><br>"
+        return summary
+
+    # 6. DEFAULT GENERAL SUMMARY
+    top_cat = by_cat.index[0] if not by_cat.empty else "N/A"
+    top_cat_spend = by_cat.iloc[0] if not by_cat.empty else 0.0
+    pct = (top_cat_spend / total_spend * 100) if total_spend > 0 else 0
+    
+    summary += f"<b>💡 AI Ledger Financial Analysis:</b><br><br>"
+    summary += f"Total logged expenses across all dates sum to <b>₹{total_spend:,.2f}</b>.<br>"
+    summary += f"- Highest expense driver: <b>{top_cat}</b> (₹{top_cat_spend:,.2f} / {pct:.1f}% of total)<br>"
+    summary += f"- Anomalies flagged: <b>{len(anoms)} unusual transaction(s)</b><br><br>"
+    summary += f"<i>Tip: Try asking 'show pie chart', 'top 5 expenses', 'food spending', or 'daily average' for specific insights!</i>"
     return summary
 
 def run_open_ended_analysis(query, df, api_key=None):
